@@ -1,0 +1,31 @@
+Inputs:
+    - j_zlogz
+    - j_c1_b0_mmdt
+    - j_c1_b1_mmdt
+    - j_c1_b2_mmdt
+    - j_c2_b1_mmdt
+    - j_c2_b2_mmdt
+    - j_d2_b1_mmdt
+    - j_d2_b2_mmdt
+    - j_d2_a1_b1_mmdt
+    - j_d2_a1_b2_mmdt
+    - j_m2_b1_mmdt
+    - j_m2_b2_mmdt
+    - j_n2_b1_mmdt
+    - j_n2_b2_mmdt
+    - j_mass_mmdt
+    - j_multiplicity
+    
+Labels:
+    - j_g
+    - j_q
+    - j_w
+    - j_z
+    - j_t
+    
+KerasModel: three_layer_model
+KerasModelRetrain: three_layer_model_constraint
+KerasLoss: categorical_crossentropy
+L1Reg: 0.0001
+NormalizeInputs: 1 
+InputType: Dense
