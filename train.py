@@ -9,12 +9,14 @@ import matplotlib.pyplot as plt
 from optparse import OptionParser
 from sklearn.model_selection import train_test_split
 from sklearn import preprocessing
-from sklearn.metrics import roc_auc_score, roc_curve, accuracy_score, confusion_matrix, average_precision_score,precision_recall_curve
+from sklearn.metrics import roc_auc_score, roc_curve, accuracy_score, confusion_matrix, average_precision_score, precision_recall_curve, auc
 import torch.optim as optim
 import yaml
 from torchsummaryX import summary
 import math
 import seaborn as sn
+from datetime import datetime
+from itertools import cycle
 
 def get_features(options, yamlConfig):
     # To use one data file:
@@ -143,21 +145,23 @@ if __name__ == "__main__":
     yamlConfig = parse_config(options.config)
 
     current_model = models.three_layer_model()
+    #current_model = models.three_layer_model_seq(16,5)
     summary(current_model,torch.zeros(16))
     current_model.double() #compains about getting doubles when expecting floats without this. Might be a problem with quantization, but dtypes *should* be handled better then
 
 
 
     # CUDA for PyTorch
-    use_cuda = False #torch.cuda.is_available()
+    use_cuda = torch.cuda.is_available() #False
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
     #X_train_val, X_test, y_train_val, y_test, labels = get_features(options,yamlConfig)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(current_model.parameters(), lr=0.0001)
-
-    batch_size = 1000
+    L1_alpha = yamlConfig['L1RegR'] if 'L1RegR' in yamlConfig else 0.01  # Keras default value if not specified
+    criterion = nn.BCELoss() #nn.CrossEntropyLoss()
+    L1_Loss = nn.L1Loss()
+    optimizer = optim.Adam(current_model.parameters(), lr=0.0001, weight_decay=1e-5) #l2 weight reg since L1 is a bit more of a pain to implement
+    batch_size = 200
     full_dataset = jet_dataset.ParticleJetDataset(options,yamlConfig)
     train_size = int(0.75 * len(full_dataset)) #25% for Validation set, 75% for train set
     val_size = len(full_dataset) - train_size
@@ -172,12 +176,15 @@ if __name__ == "__main__":
 
     val_loader =   torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
                                               shuffle=True, num_workers=0)
+    test_loader = torch.utils.data.DataLoader(val_dataset, batch_size=val_size,
+                                              shuffle=False, num_workers=0)
     val_losses = []
     train_losses = []
     roc_auc_scores = []
     avg_precision_scores = []
     accuracy_scores = []
-    L1_alpha = yamlConfig['L1RegR'] if 'L1RegR' in yamlConfig else 0.01  # Keras default value if not specified
+    current_model.to(device)
+
     for epoch in range(options.epochs):  # loop over the dataset multiple times
         running_loss = 0.0
         # Training
@@ -189,13 +196,16 @@ if __name__ == "__main__":
             # forward + backward + optimize
             optimizer.zero_grad()
             outputs = current_model(local_batch)
-            criterion_loss = criterion(outputs, torch.max(local_labels, 1)[1]) #via https://discuss.pytorch.org/t/runtimeerror-multi-target-not-supported-newbie/10216/2
+            criterion_loss = criterion(outputs,local_labels)
+            #criterion_loss = criterion(outputs, torch.max(local_labels, 1)[1]) #via https://discuss.pytorch.org/t/runtimeerror-multi-target-not-supported-newbie/10216/2
+            #l1 = L1_Loss(outputs, torch.max(local_labels, 1)[1])
             #l1 reg on weights
-            L1_reg = torch.tensor(0., requires_grad=True)
-            for name, param in current_model.named_parameters():
-                if 'weight' in name:
-                    L1_reg = L1_reg + torch.norm(param, 1)
-            total_loss = criterion_loss + (L1_alpha * L1_reg)
+
+            #L1_reg = torch.tensor(0., requires_grad=True)
+            #for name, param in current_model.named_parameters():
+            #    if 'weight' in name:
+            #        L1_reg = L1_reg + torch.norm(param, 1)
+            total_loss = criterion_loss# + (L1_reg*L1_alpha)
             total_loss.backward()
             optimizer.step()
             step_loss = total_loss.item()
@@ -210,14 +220,18 @@ if __name__ == "__main__":
             current_model.eval()
             for i, data in enumerate(val_loader, 0):
                 local_batch, local_labels = data
+                local_batch, local_labels = local_batch.to(device), local_labels.to(device)
                 outputs = current_model(local_batch)
-                L1_reg = torch.tensor(0., requires_grad=True)
-                for name, param in current_model.named_parameters():
-                    if 'weight' in name:
-                        L1_reg = L1_reg + torch.norm(param, 1)
-                val_loss = criterion(outputs, torch.max(local_labels, 1)[1])  + (L1_alpha * L1_reg)
+                #l1 = L1_Loss(outputs, torch.max(local_labels, 1)[1])
+                #for name, param in current_model.named_parameters():
+                #    if 'weight' in name:
+                #        L1_reg = L1_reg + torch.norm(param, 1)
+                val_loss = criterion(outputs,local_labels)#  + (L1_alpha * L1_reg)
+                #val_loss = criterion(outputs, torch.max(local_labels, 1)[1])  # + (L1_alpha * L1_reg)
                 #print(local_labels.numpy())
                 #print(outputs.numpy())
+                local_batch, local_labels = local_batch.cpu(), local_labels.cpu()
+                outputs = outputs.cpu()
                 val_roc_auc_score = roc_auc_score(local_labels.numpy(), outputs.numpy())
                 val_avg_precision = average_precision_score(local_labels.numpy(), outputs.numpy())
                 #roc_auc_scores.append(val_roc_auc_score)
@@ -228,21 +242,25 @@ if __name__ == "__main__":
                     val_losses.append(val_loss)
                     roc_auc_scores.append(val_roc_auc_score)
                     avg_precision_scores.append(val_avg_precision)
-
+    now = datetime.now()
+    time = now.strftime("%d-%m-%Y_%H-%M-%S")
     print("ROC AUC Table size: " + str(len(roc_auc_scores)))
     plt.plot(train_losses,color='r',linestyle='solid', alpha=0.3)
     plt.plot(val_losses, color='g',linestyle='dashed')
     plt.legend(['Train Loss', 'Val Loss'], loc='upper left')
-    plt.ylabel("Batch Loss (perk 1k samples)")
+    plt.ylabel("Batch Loss (Per " + str(batch_size) + " Samples)")
     plt.xlabel("Epoch")
+    plt.savefig(options.outputDir + 'loss_' + str(time) +'.png')
     plt.show()
     plt.plot(roc_auc_scores,color='r',linestyle='solid', alpha=0.3)
     plt.ylabel("ROC AUC")
     plt.xlabel("Epoch")
+    plt.savefig(options.outputDir + 'ROCAUC_' + str(time) + '.png')
     plt.show()
     plt.plot(avg_precision_scores,color='r',linestyle='solid', alpha=0.3)
     plt.ylabel("Avg Precision")
     plt.xlabel("Epoch")
+    plt.savefig(options.outputDir + 'avgPrec_' + str(time) + '.png')
     plt.show()
 
     # Initialize the prediction and label lists(tensors)
@@ -250,34 +268,37 @@ if __name__ == "__main__":
     lbllist = torch.zeros(0, dtype=torch.long, device='cpu')
     outlist = torch.zeros(0, dtype=torch.long, device='cpu')
     prob_labels = torch.zeros(0, dtype=torch.long, device='cpu')
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
     with torch.no_grad():
-        for i, data in enumerate(val_loader):
+        for i, data in enumerate(test_loader):
             current_model.eval()
             local_batch, local_labels = data
+            local_batch, local_labels = local_batch.to(device), local_labels.to(device)
             outputs = current_model(local_batch)
             _, preds = torch.max(outputs, 1)
-            print(preds)
-
             # Append batch prediction results
             #outlist = torch.cat([outlist, outputs.cpu().type(torch.DoubleTensor)])
             #prob_labels = torch.cat([prob_labels, local_labels.cpu().type(torch.DoubleTensor)])
             predlist = torch.cat([predlist, preds.view(-1).cpu()])
             lbllist = torch.cat([lbllist, torch.max(local_labels, 1)[1].view(-1).cpu()])
-            print(lbllist)
-            print(predlist)
-            #val_roc_curve = roc_curve(local_labels.numpy(), outputs.numpy())
+            #print(lbllist)
+            #print(predlist)
 
+    # val_roc_curve = roc_curve(local_labels.numpy(), outputs.numpy())
     # Confusion matrix
     conf_mat = confusion_matrix(lbllist.numpy(), predlist.numpy())
-
     df_cm = pd.DataFrame(conf_mat, index=[i for i in full_dataset.labels_list],
                          columns=[i for i in full_dataset.labels_list])
     plt.figure(figsize=(10, 7))
     sn.heatmap(df_cm, annot=True,fmt='g')
-
+    plt.savefig(options.outputDir + 'confMatrix_' + str(time) + '.png')
     plt.show()
-
-
     print(conf_mat)
+    class_accuracy = 100 * conf_mat.diagonal() / conf_mat.sum(1)
+    print(class_accuracy)
+
+
 
     print('Finished Training')

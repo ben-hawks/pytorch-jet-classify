@@ -12,26 +12,46 @@ class ParticleJetDataset(Dataset):
     """CMS Particle Jet dataset."""
 
     def __init__(self, options, yamlConfig, normalize=True):
-
-        # To use one data file:
-        self.h5File = h5py.File(options.inputFile, 'r', libver='latest', swmr=True)
-
+        data_path = options.inputFile
 
         # List of features to use
         features = yamlConfig['Inputs']
         self.features_list = features
-        #print(features)
         # List of labels to use
         labels = yamlConfig['Labels']
         self.labels_list = labels
-       # print(labels)
-        # Convert to dataframe
-        columns_arr = np.array(self.h5File['jetFeatureNames'][:]).astype(str) #slicing h5 data because otherwise it's a reference to the actual file?
-        features_labels_df = pd.DataFrame(self.h5File["jets"][:], columns=columns_arr)
-        #print(features_labels_df.columns) #H5 File doesn't have column names, ugh. this has caused me a bunch of headaches
-        #features_labels_df = features_labels_df[features]
-        features_labels_df = features_labels_df.drop_duplicates()
 
+        columns_arr = np.array([])
+        features_labels_df = pd.DataFrame()
+        #Check/Handle directory of files vs 1 file
+        if os.path.isdir(data_path):
+            print("Directory of data files found!")
+            first = True
+            for file in os.listdir(data_path):
+                if file.endswith(".h5") or file.endswith(".h5df"):
+                    try:
+                        print("Loading " + str(file))
+                        self.h5File = h5py.File(os.path.join(data_path,file), 'r', libver='latest', swmr=True)
+                        if first:
+                            columns_arr = np.array(self.h5File['jetFeatureNames'][:]).astype(str)  # slicing h5 data because otherwise it's a reference to the actual file?
+                            first = False
+                        this_file = pd.DataFrame(self.h5File["jets"][:], columns=columns_arr)
+                        features_labels_df = pd.concat([features_labels_df,this_file],axis=0) #concat along axis 0 if doesn't work?
+                        self.h5File.close()
+                    except:
+                        print("Error! Failed to load jet file " + file)
+        elif os.path.isfile(data_path):
+            print("Single data file found!")
+            self.h5File = h5py.File(options.inputFile, 'r', libver='latest', swmr=True)
+            # Convert to dataframe
+            columns_arr = np.array(self.h5File['jetFeatureNames'][:]).astype(str)  # slicing h5 data because otherwise it's a reference to the actual file?
+            features_labels_df = pd.DataFrame(self.h5File["jets"][:], columns=columns_arr)
+        else:
+            print("Error! path specified is a special file (socket, FIFO, device file), or isn't valid")
+
+        features_labels_df = features_labels_df.drop_duplicates()
+        #print(columns_arr)
+        #print(features_labels_df)
         features_df = features_labels_df[features]
         labels_df = features_labels_df[labels]
         # Convert to numpy array
