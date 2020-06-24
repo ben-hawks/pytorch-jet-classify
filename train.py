@@ -129,24 +129,26 @@ def parse_config(config_file) :
 
     print("Loading configuration from", config_file)
     config = open(config_file, 'r')
-    return yaml.load(config)
+    return yaml.load(config, Loader=yaml.FullLoader)
 
 
 
 if __name__ == "__main__":
     parser = OptionParser()
-    parser.add_option('-i','--input'   ,action='store',type='string',dest='inputFile'   ,default='', help='input file')
+    parser.add_option('-i','--input'   ,action='store',type='string',dest='inputFile'   ,default='', help='location of data to train off of')
     parser.add_option('-o','--output'   ,action='store',type='string',dest='outputDir'   ,default='train_simple/', help='output directory')
-    parser.add_option('-t','--tree'   ,action='store',type='string',dest='tree'   ,default='t_allpar_new', help='tree name')
+    parser.add_option('-t','--test'   ,action='store',type='string',dest='test'   ,default='', help='Location of test data set')
+    parser.add_option('-l','--load', action='store', type='string', dest='modelLoad', default=None, help='Model to load instead of training new')
     parser.add_option('-c','--config'   ,action='store',type='string',dest='config'   ,default='configs/train_config_threelayer.yml', help='tree name')
     parser.add_option('-e','--epochs'   ,action='store',type='int', dest='epochs', default=100, help='number of epochs to train for')
     (options,args) = parser.parse_args()
-    print(options.config)
+    #print(options.config)
     yamlConfig = parse_config(options.config)
 
-    current_model = models.three_layer_model()
+    #current_model = models.three_layer_model()
+    current_model = models.three_layer_model_bv()
     #current_model = models.three_layer_model_seq(16,5)
-    summary(current_model,torch.zeros(16))
+   # summary(current_model,torch.zeros(16))
     current_model.double() #compains about getting doubles when expecting floats without this. Might be a problem with quantization, but dtypes *should* be handled better then
 
 
@@ -162,7 +164,8 @@ if __name__ == "__main__":
     L1_Loss = nn.L1Loss()
     optimizer = optim.Adam(current_model.parameters(), lr=0.0001, weight_decay=1e-5) #l2 weight reg since L1 is a bit more of a pain to implement
     batch_size = 200
-    full_dataset = jet_dataset.ParticleJetDataset(options,yamlConfig)
+    full_dataset = jet_dataset.ParticleJetDataset(options.inputFile,yamlConfig)
+    test_dataset = jet_dataset.ParticleJetDataset(options.test, yamlConfig)
     train_size = int(0.75 * len(full_dataset)) #25% for Validation set, 75% for train set
     val_size = len(full_dataset) - train_size
     num_val_batches = math.ceil(val_size/batch_size)
@@ -170,13 +173,15 @@ if __name__ == "__main__":
     print("train_batches " + str(num_train_batches))
     print("val_batches " + str(num_val_batches))
     train_dataset, val_dataset =  torch.utils.data.random_split(full_dataset,[train_size,val_size])#Figure out data loading
-
+    print("train dataset size: " + str(len(train_dataset)))
+    print("validation dataset size: " + str(len(val_dataset)))
+    print("test dataset size: " + str(len(test_dataset)))
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
                                               shuffle=True, num_workers=0) #FFS, have to use numworkers = 0 because apparently h5 objects can't be pickled, https://github.com/WuJie1010/Facial-Expression-Recognition.Pytorch/issues/69
 
     val_loader =   torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
                                               shuffle=True, num_workers=0)
-    test_loader = torch.utils.data.DataLoader(val_dataset, batch_size=val_size,
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=val_size,
                                               shuffle=False, num_workers=0)
     val_losses = []
     train_losses = []
@@ -213,8 +218,6 @@ if __name__ == "__main__":
             if i == num_train_batches-1: #print every 8 batches for less console spam
                 print('[epoch %d, batch: %1d] train batch loss: %.7f' % (epoch + 1, i + 1, step_loss))
                 train_losses.append(step_loss)
-            if epoch % 100 == 0:
-                print(outputs[0])
             # Validation
         with torch.set_grad_enabled(False):
             current_model.eval()
@@ -266,8 +269,8 @@ if __name__ == "__main__":
     # Initialize the prediction and label lists(tensors)
     predlist = torch.zeros(0, dtype=torch.long, device='cpu')
     lbllist = torch.zeros(0, dtype=torch.long, device='cpu')
-    outlist = torch.zeros(0, dtype=torch.long, device='cpu')
-    prob_labels = torch.zeros(0, dtype=torch.long, device='cpu')
+    outlist = torch.zeros(0, dtype=torch.double, device='cpu')
+    prob_labels = torch.zeros(0, dtype=torch.double, device='cpu')
     fpr = dict()
     tpr = dict()
     roc_auc = dict()
@@ -279,14 +282,49 @@ if __name__ == "__main__":
             outputs = current_model(local_batch)
             _, preds = torch.max(outputs, 1)
             # Append batch prediction results
-            #outlist = torch.cat([outlist, outputs.cpu().type(torch.DoubleTensor)])
-            #prob_labels = torch.cat([prob_labels, local_labels.cpu().type(torch.DoubleTensor)])
+            outlist = torch.cat([outlist, outputs.cpu().type(torch.DoubleTensor)]).type(torch.DoubleTensor)
+            prob_labels = torch.cat([prob_labels, local_labels.cpu().type(torch.DoubleTensor)]).type(torch.DoubleTensor)
             predlist = torch.cat([predlist, preds.view(-1).cpu()])
             lbllist = torch.cat([lbllist, torch.max(local_labels, 1)[1].view(-1).cpu()])
             #print(lbllist)
             #print(predlist)
+            lo = prob_labels.cpu()
+            outlist = outlist.cpu()
+#        val_roc_curve = roc_curve(prob_labels.numpy(), outlist.numpy())
 
-    # val_roc_curve = roc_curve(local_labels.numpy(), outputs.numpy())
+        outputs = outputs.cpu()
+        local_labels = local_labels.cpu()
+        predict_test = outputs.numpy()
+        print(len(predict_test))
+        df = pd.DataFrame()
+        fpr = {}
+        tpr = {}
+        auc1 = {}
+
+        plt.figure()
+        for i, label in enumerate(full_dataset.labels_list):
+            print(str(i) + " " + label)
+            print(predict_test[:, i])
+            df[label] = local_labels[:, i]
+            print(df)
+            print(len(predict_test[:, i]))
+            df[label + '_pred'] = predict_test[:, i]
+
+            fpr[label], tpr[label], threshold = roc_curve(df[label], df[label + '_pred'])
+
+            auc1[label] = auc(fpr[label], tpr[label])
+
+            plt.plot(tpr[label], fpr[label],
+                     label='%s tagger, AUC = %.1f%%' % (label.replace('j_', ''), auc1[label] * 100.))
+        plt.semilogy()
+        plt.xlabel("Signal Efficiency")
+        plt.ylabel("Background Efficiency")
+        plt.ylim(0.001, 1)
+        plt.grid(True)
+        plt.legend(loc='upper left')
+        plt.figtext(0.25, 0.90, 'hls4ml', fontweight='bold', wrap=True, horizontalalignment='right', fontsize=14)
+        plt.savefig(options.outputDir + 'ROC_' + str(time) + '.png' % ())
+
     # Confusion matrix
     conf_mat = confusion_matrix(lbllist.numpy(), predlist.numpy())
     df_cm = pd.DataFrame(conf_mat, index=[i for i in full_dataset.labels_list],
@@ -298,6 +336,8 @@ if __name__ == "__main__":
     print(conf_mat)
     class_accuracy = 100 * conf_mat.diagonal() / conf_mat.sum(1)
     print(class_accuracy)
+
+    torch.save(current_model.state_dict(), options.outputDir + 'JetClassifyModel_' + str(time) + '.pt')
 
 
 

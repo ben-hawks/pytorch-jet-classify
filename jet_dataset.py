@@ -11,8 +11,8 @@ from sklearn.metrics import auc, roc_curve, accuracy_score
 class ParticleJetDataset(Dataset):
     """CMS Particle Jet dataset."""
 
-    def __init__(self, options, yamlConfig, normalize=True):
-        data_path = options.inputFile
+    def __init__(self, dataPath, yamlConfig, normalize=True):
+        data_path = dataPath
 
         # List of features to use
         features = yamlConfig['Inputs']
@@ -42,7 +42,7 @@ class ParticleJetDataset(Dataset):
                         print("Error! Failed to load jet file " + file)
         elif os.path.isfile(data_path):
             print("Single data file found!")
-            self.h5File = h5py.File(options.inputFile, 'r', libver='latest', swmr=True)
+            self.h5File = h5py.File(dataPath, 'r', libver='latest', swmr=True)
             # Convert to dataframe
             columns_arr = np.array(self.h5File['jetFeatureNames'][:]).astype(str)  # slicing h5 data because otherwise it's a reference to the actual file?
             features_labels_df = pd.DataFrame(self.h5File["jets"][:], columns=columns_arr)
@@ -70,6 +70,7 @@ class ParticleJetDataset(Dataset):
                     and yamlConfig['InputType'] != 'Conv2D':
                 scaler = preprocessing.StandardScaler().fit(self.features_val)
                 self.features_val = scaler.transform(self.features_val)
+                print("Scaled Features Data W/ StandardScaler")
 
             # Normalize inputs (w/ MinMax for squared hinge)
             if yamlConfig['NormalizeInputs'] and yamlConfig['InputType'] != 'Conv1D' \
@@ -77,6 +78,7 @@ class ParticleJetDataset(Dataset):
                     and  yamlConfig['KerasLoss'] == 'squared_hinge':
                 scaler = preprocessing.MinMaxScaler().fit(self.features_val)
                 self.features_val = scaler.transform(self.features_val)
+                print("Scaled Features Data W/ MinMaxScaler")
 
             # Normalize conv inputs
             if yamlConfig['NormalizeInputs'] and yamlConfig['InputType'] == 'Conv1D':
@@ -85,6 +87,7 @@ class ParticleJetDataset(Dataset):
                 scaler = preprocessing.StandardScaler().fit(reshape_X_train_val)
                 for p in range(self.features_val.shape[1]):
                     self.features_val[:, p, :] = scaler.transform(self.features_val[:, p, :])
+                print("Reshaped data for conv and Scaled Features Data W/ StandardScaler")
 
     def __getitem__(self, index):
         return self.features_val[index], self.labels_val[index]

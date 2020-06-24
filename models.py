@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import numpy as np
-
+import brevitas.nn as qnn
+from brevitas.core.quant import QuantType
 
 
 class three_layer_model(nn.Module):
@@ -24,6 +25,43 @@ class three_layer_model(nn.Module):
             #softmax_out = self.softmax(x)
 
             return softmax_out
+
+
+class three_layer_model_bv(nn.Module):
+    def __init__(self):
+        # Model with <16,64,32,32,5> Behavior
+        super(three_layer_model_bv, self).__init__()
+        self.input_shape = int(16)  # (16,)
+        self.weight_precision = 4
+        self.fc1 = qnn.QuantLinear(self.input_shape, int(64),
+                                   bias=True, #Todo Undersand what Bias does
+                                   weight_quant_type=QuantType.INT,
+                                   weight_bit_width=self.weight_precision)
+        self.fc2 = qnn.QuantLinear(64, 32,
+                                   bias=True,
+                                   weight_quant_type=QuantType.INT,
+                                   weight_bit_width=self.weight_precision)
+        self.fc3 = qnn.QuantLinear(32, 32,
+                                   bias=True,
+                                   weight_quant_type=QuantType.INT,
+                                   weight_bit_width=self.weight_precision)
+        self.fc4 = qnn.QuantLinear(32, 5,
+                                   bias=True,
+                                   weight_quant_type=QuantType.INT,
+                                   weight_bit_width=self.weight_precision)
+        self.act = qnn.QuantReLU(quant_type=QuantType.INT, bit_width=self.weight_precision, max_val=6) #TODO Check/Change this away from 6, do we have to set a max value here? Can we not?
+        self.softmax = nn.Softmax(0)
+
+    def forward(self, x):
+        test = self.fc1(x)
+        x = self.act(test)
+        x = self.act(self.fc2(x))
+        x = self.act(self.fc3(x))
+        softmax_out = self.softmax(self.fc4(x))
+        # softmax_out = self.softmax(x)
+
+        return softmax_out
+
 
 def three_layer_model_seq(Inputs, nclasses, l1Reg=0):
     """
