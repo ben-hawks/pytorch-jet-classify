@@ -145,11 +145,11 @@ if __name__ == "__main__":
     #print(options.config)
     yamlConfig = parse_config(options.config)
 
-    #current_model = models.three_layer_model()
-    current_model = models.three_layer_model_bv()
+    current_model = models.three_layer_model()
+    #current_model = models.three_layer_model_bv()
     #current_model = models.three_layer_model_seq(16,5)
    # summary(current_model,torch.zeros(16))
-    current_model.double() #compains about getting doubles when expecting floats without this. Might be a problem with quantization, but dtypes *should* be handled better then
+    #current_model.() #compains about getting doubles when expecting floats without this. Might be a problem with quantization, but dtypes *should* be handled better then
 
 
 
@@ -200,8 +200,8 @@ if __name__ == "__main__":
             local_batch, local_labels = local_batch.to(device), local_labels.to(device)
             # forward + backward + optimize
             optimizer.zero_grad()
-            outputs = current_model(local_batch)
-            criterion_loss = criterion(outputs,local_labels)
+            outputs = current_model(local_batch.float())
+            criterion_loss = criterion(outputs,local_labels.float())
             #criterion_loss = criterion(outputs, torch.max(local_labels, 1)[1]) #via https://discuss.pytorch.org/t/runtimeerror-multi-target-not-supported-newbie/10216/2
             #l1 = L1_Loss(outputs, torch.max(local_labels, 1)[1])
             #l1 reg on weights
@@ -224,12 +224,12 @@ if __name__ == "__main__":
             for i, data in enumerate(val_loader, 0):
                 local_batch, local_labels = data
                 local_batch, local_labels = local_batch.to(device), local_labels.to(device)
-                outputs = current_model(local_batch)
+                outputs = current_model(local_batch.float())
                 #l1 = L1_Loss(outputs, torch.max(local_labels, 1)[1])
                 #for name, param in current_model.named_parameters():
                 #    if 'weight' in name:
                 #        L1_reg = L1_reg + torch.norm(param, 1)
-                val_loss = criterion(outputs,local_labels)#  + (L1_alpha * L1_reg)
+                val_loss = criterion(outputs,local_labels.float())#  + (L1_alpha * L1_reg)
                 #val_loss = criterion(outputs, torch.max(local_labels, 1)[1])  # + (L1_alpha * L1_reg)
                 #print(local_labels.numpy())
                 #print(outputs.numpy())
@@ -279,7 +279,7 @@ if __name__ == "__main__":
             current_model.eval()
             local_batch, local_labels = data
             local_batch, local_labels = local_batch.to(device), local_labels.to(device)
-            outputs = current_model(local_batch)
+            outputs = current_model(local_batch.float())
             _, preds = torch.max(outputs, 1)
             # Append batch prediction results
             outlist = torch.cat([outlist, outputs.cpu().type(torch.DoubleTensor)]).type(torch.DoubleTensor)

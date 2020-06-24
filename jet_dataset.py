@@ -55,8 +55,8 @@ class ParticleJetDataset(Dataset):
         features_df = features_labels_df[features]
         labels_df = features_labels_df[labels]
         # Convert to numpy array
-        self.features_val = features_df.values
-        self.labels_val = labels_df.values
+        self.features_val = features_df.values.astype(np.float)
+        self.labels_val = labels_df.values.astype(np.float)
 
         if 'j_index' in features:
             self.features_val = self.features_val[:, :-1]  # drop the j_index feature
