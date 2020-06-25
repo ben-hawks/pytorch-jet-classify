@@ -6,7 +6,6 @@ import io
 import os
 import numpy as np
 from sklearn import preprocessing
-from sklearn.metrics import auc, roc_curve, accuracy_score
 
 class ParticleJetDataset(Dataset):
     """CMS Particle Jet dataset."""
@@ -50,8 +49,6 @@ class ParticleJetDataset(Dataset):
             print("Error! path specified is a special file (socket, FIFO, device file), or isn't valid")
 
         features_labels_df = features_labels_df.drop_duplicates()
-        #print(columns_arr)
-        #print(features_labels_df)
         features_df = features_labels_df[features]
         labels_df = features_labels_df[labels]
         # Convert to numpy array
