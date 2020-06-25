@@ -34,7 +34,7 @@ class three_layer_model_bv(nn.Module):
         self.input_shape = int(16)  # (16,)
         self.weight_precision = 4
         self.fc1 = qnn.QuantLinear(self.input_shape, int(64),
-                                   bias=True, #Todo Undersand what Bias does
+                                   bias=True,
                                    weight_quant_type=QuantType.INT,
                                    weight_bit_width=self.weight_precision)
         self.fc2 = qnn.QuantLinear(64, 32,
