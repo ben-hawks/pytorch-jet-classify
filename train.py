@@ -8,9 +8,12 @@ import matplotlib.pyplot as plt
 from optparse import OptionParser
 from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix, average_precision_score, auc
 import torch.optim as optim
+import torch.nn.utils.prune as prune
 import yaml
 import math
 import seaborn as sn
+import plot_weights
+import copy
 from datetime import datetime
 
 ## Config module
@@ -46,11 +49,12 @@ if __name__ == "__main__":
     criterion = nn.BCELoss()
     L1_Loss = nn.L1Loss()
     optimizer = optim.Adam(current_model.parameters(), lr=0.0001, weight_decay=1e-5) #l2 weight reg since L1 is a bit more of a pain to implement
-    batch_size = 200
+    batch_size = 1024 #200
     full_dataset = jet_dataset.ParticleJetDataset(options.inputFile,yamlConfig)
     test_dataset = jet_dataset.ParticleJetDataset(options.test, yamlConfig)
     train_size = int(0.75 * len(full_dataset)) #25% for Validation set, 75% for train set
     val_size = len(full_dataset) - train_size
+    test_size = len(test_dataset)
     num_val_batches = math.ceil(val_size/batch_size)
     num_train_batches = math.ceil(train_size/batch_size)
     print("train_batches " + str(num_train_batches))
@@ -64,7 +68,7 @@ if __name__ == "__main__":
 
     val_loader =   torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
                                               shuffle=True, num_workers=0)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=val_size,
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=test_size,
                                               shuffle=False, num_workers=0)
     val_losses = []
     train_losses = []
@@ -201,7 +205,7 @@ if __name__ == "__main__":
         plt.ylim(0.001, 1)
         plt.grid(True)
         plt.legend(loc='upper left')
-        plt.figtext(0.25, 0.90, 'hls4ml', fontweight='bold', wrap=True, horizontalalignment='right', fontsize=14)
+        plt.figtext(0.25, 0.90, '(Unpruned)', fontweight='bold', wrap=True, horizontalalignment='right', fontsize=14)
         plt.savefig(options.outputDir + 'ROC_' + str(time) + '.png' % ())
 
     # Confusion matrix
@@ -217,7 +221,7 @@ if __name__ == "__main__":
     print(class_accuracy)
 
     torch.save(current_model.state_dict(), options.outputDir + 'JetClassifyModel_' + str(time) + '.pt')
-
+    plot_weights.plot_kernels(current_model,text=" (Locally Pruned)")
 
 
     print('Finished Training')
