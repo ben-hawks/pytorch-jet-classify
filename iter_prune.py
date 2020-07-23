@@ -61,7 +61,7 @@ def train(model, optimizer, loss, train_loader, L1_factor=0.0001):
         total_loss.backward()
         optimizer.step()
         step_loss = total_loss.item()
-        train_losses.append(step_loss)  # was commented, uncommented for early stopping, revert if fucky
+        train_losses.append(step_loss)
     return model, train_losses
 
 
@@ -257,7 +257,7 @@ if __name__ == "__main__":
     ]
 
     model_set = [models.three_layer_model_masked(prune_mask_set[0]), models.three_layer_model_bv_masked(
-        prune_mask_set[1])]  # First model should be the "Base" model that all other accuracys are compared to!
+        prune_mask_set[1])]  # First model should be the "Base" model that all other accuracies are compared to!
 
     # Sets for per-model Results/Data to plot
     prune_result_set = []
@@ -271,8 +271,8 @@ if __name__ == "__main__":
     first_run = True
     first_quant = False
 
-    #setup cuda, TODO CUDA currently not working, investigate why
-    use_cuda = False #  torch.cuda.is_available()
+    # Setup cuda, TODO CUDA currently not working, investigate why
+    use_cuda = False  # torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
@@ -280,10 +280,10 @@ if __name__ == "__main__":
     batch_size = 1024
     train_split = 0.75
 
-    #setup and split dataset
+    # Setup and split dataset
     full_dataset = jet_dataset.ParticleJetDataset(options.inputFile,yamlConfig)
     test_dataset = jet_dataset.ParticleJetDataset(options.test, yamlConfig)
-    train_size = int(train_split * len(full_dataset)) # 25% for Validation set, 75% for train set
+    train_size = int(train_split * len(full_dataset))  # 25% for Validation set, 75% for train set
 
     val_size = len(full_dataset) - train_size
     test_size = len(test_dataset)
@@ -327,6 +327,8 @@ if __name__ == "__main__":
             accuracy_scores = []
 
             early_stopping = EarlyStopping(patience=options.patience, verbose=True)
+
+            model.update_masks(prune_mask)  # Make sure to update the masks within the model
 
             optimizer = optim.Adam(model.parameters(), lr=0.0001)
             criterion = nn.BCELoss()
@@ -397,7 +399,7 @@ if __name__ == "__main__":
             # update our epoch counter to represent where the model actually stopped training
             epoch_counter -= ((len(avg_valid_losses)) - minposs)
 
-            #plot losses for this iter
+            # Plot losses for this iter
             plt.axvline(minposs+1, linestyle='--', color='r', label='Early Stopping Checkpoint')
             plt.xlabel('epochs')
             plt.ylabel('loss')
@@ -410,12 +412,13 @@ if __name__ == "__main__":
 
             # Prune & Test model
             nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
-            #Time for filenames
+            # Time for filenames
             now = datetime.now()
             time = now.strftime("%d-%m-%Y_%H-%M-%S")
 
             if first_run:
                 # Test base model, first iteration of the float model
+                print("Base Float Model:")
                 base_params = countNonZeroWeights(model)
                 accuracy_score_value_list, roc_auc_score_list = test(model, test_loader, pruned_params=0, base_params=base_params)
                 base_accuracy_score = np.average(accuracy_score_value_list)
@@ -427,9 +430,9 @@ if __name__ == "__main__":
                 model_filename = path.join(options.outputDir, "{}b_unpruned_{}.pth".format(nbits, time))
                 torch.save(model.state_dict(),model_filename)
                 first_run = False
-                # first run set below
             elif first_quant:
                 # Test Unpruned, Base Quant model
+                print("Base Quant Model: ")
                 base_quant_params = countNonZeroWeights(model)
                 accuracy_score_value_list, roc_auc_score_list = test(model, test_loader, pruned_params=0, base_params=base_quant_params)
                 base_quant_accuracy_score = np.average(accuracy_score_value_list)
@@ -442,6 +445,7 @@ if __name__ == "__main__":
                 torch.save(model.state_dict(),model_filename)
                 first_quant = False
             else:
+                print("Pre Pruning:")
                 current_params = countNonZeroWeights(model)
                 accuracy_score_value_list, roc_auc_score_list = test(model, test_loader, pruned_params=(base_params-current_params), base_params=base_params)
                 accuracy_score_value = np.average(accuracy_score_value_list)
@@ -457,6 +461,7 @@ if __name__ == "__main__":
                 model = prune_model(model, prune_value, prune_mask)
                 # Plot weight dist
                 filename = path.join(options.outputDir, 'weight_dist_{}b_e{}_{}.png'.format(nbits, epoch_counter, time))
+                print("Post Pruning: ")
                 pruned_params = countNonZeroWeights(model)
                 plot_weights.plot_kernels(model,
                                           text=' (Pruned ' + str(base_params - pruned_params) + ' out of ' + str(
