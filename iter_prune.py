@@ -403,12 +403,17 @@ if __name__ == "__main__":
             plt.ylabel('loss')
             plt.grid(True)
             plt.legend()
-            plt.show()
             filename = 'loss_plot_e{}_{}_.png'.format(epoch_counter,time)
             plt.savefig(path.join(options.outputDir + filename), bbox_inches='tight')
+            plt.show()
+
 
             # Prune & Test model
             nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
+            #Time for filenames
+            now = datetime.now()
+            time = now.strftime("%d-%m-%Y_%H-%M-%S")
+
             if first_run:
                 # Test base model, first iteration of the float model
                 base_params = countNonZeroWeights(model)
@@ -419,6 +424,8 @@ if __name__ == "__main__":
                 plot_weights.plot_kernels(model,
                                           text=' (Unpruned FP Model)',
                                           output=filename)
+                model_filename = path.join(options.outputDir, "{}b_unpruned_{}.pth".format(nbits, time))
+                torch.save(model.state_dict(),model_filename)
                 first_run = False
                 # first run set below
             elif first_quant:
@@ -431,6 +438,8 @@ if __name__ == "__main__":
                 plot_weights.plot_kernels(model,
                                           text=' (Unpruned Quant Model)',
                                           output=filename)
+                model_filename = path.join(options.outputDir, "{}b_unpruned_{}.pth".format(nbits, time))
+                torch.save(model.state_dict(),model_filename)
                 first_quant = False
             else:
                 current_params = countNonZeroWeights(model)
@@ -440,12 +449,14 @@ if __name__ == "__main__":
                 prune_results.append(1 / (accuracy_score_value / base_accuracy_score))
                 prune_roc_results.append(1/ (roc_auc_score_value/ base_roc_score))
                 bit_params.append(current_params * nbits)
+                model_filename = path.join(options.outputDir, "{}b_{}pruned_{}.pth".format(nbits, (base_params-current_params), time))
+                torch.save(model.state_dict(),model_filename)
 
             # Prune for next iter
             if prune_value > 0:
-                prune_model(model, prune_value, prune_mask)
+                model = prune_model(model, prune_value, prune_mask)
                 # Plot weight dist
-                filename = path.join(options.outputDir, 'weight_dist_{}b_e{}.png'.format(nbits, epoch_counter))
+                filename = path.join(options.outputDir, 'weight_dist_{}b_e{}_{}.png'.format(nbits, epoch_counter, time))
                 pruned_params = countNonZeroWeights(model)
                 plot_weights.plot_kernels(model,
                                           text=' (Pruned ' + str(base_params - pruned_params) + ' out of ' + str(
