@@ -48,6 +48,8 @@ def l1_regularizer(model, lambda_l1=0.01):
 
 def train(model, optimizer, loss, train_loader, L1_factor=0.0001):
     train_losses = []
+    model.to(device)
+    model.mask_to_device(device)
     for i, data in enumerate(train_loader, 0):
         local_batch, local_labels = data
         model.train()
@@ -69,6 +71,7 @@ def val(model, loss, val_loader, L1_factor=0.01):
     val_roc_auc_scores_list = []
     val_avg_precision_list = []
     val_losses = []
+    model.to(device)
     with torch.set_grad_enabled(False):
         model.eval()
         for i, data in enumerate(val_loader, 0):
@@ -245,7 +248,7 @@ if __name__ == "__main__":
     prune_value_set = [0.10, 0.111, .125, .143, .166, .20, .25, .333, .50, .666, .666,#take ~10% of the "original" value each time, reducing to ~15% original network size
                        0]  # Last 0 is so the final iteration can fine tune before testing
 
-    og_prune_mask_set = [
+    prune_mask_set = [
         {  # Float Model
             "fc1": torch.ones(64, 16),
             "fc2": torch.ones(32, 64),
@@ -256,7 +259,7 @@ if __name__ == "__main__":
             "fc3": torch.ones(32, 32)}
     ]
 
-    prune_mask_set = [
+    scaled_prune_mask_set = [
         {  # 1/4 Quant Model
             "fc1": torch.ones(16, 16),
             "fc2": torch.ones(8, 16),
@@ -266,8 +269,7 @@ if __name__ == "__main__":
             "fc2": torch.ones(128, 256),
             "fc3": torch.ones(128, 128)}
     ]
-    model_set = [models.three_layer_model_bv_masked_quarter(prune_mask_set[0]), models.three_layer_model_bv_masked_quad(
-        prune_mask_set[1])]  # First model should be the "Base" model that all other accuracies are compared to!
+    model_set = [models.three_layer_model_bv_batnorm_masked(prune_mask_set[0])]  # First model should be the "Base" model that all other accuracies are compared to!
 
     # Sets for per-model Results/Data to plot
     prune_result_set = []
@@ -282,8 +284,9 @@ if __name__ == "__main__":
     first_quant = False
 
     # Setup cuda, TODO CUDA currently not working, investigate why
-    use_cuda = False  # torch.cuda.is_available()
+    use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
+    print("Using Device: {}".format(device))
     torch.backends.cudnn.benchmark = True
 
     # Set Batch size and split value
@@ -361,8 +364,16 @@ if __name__ == "__main__":
                 val_losses, val_avg_precision_list, val_roc_auc_scores_list = val(model, criterion, val_loader, L1_factor=L1_factor)
 
                 # Calculate average epoch statistics
-                train_loss = np.average(train_losses)
-                valid_loss = np.average(val_losses)
+                try:
+                    train_loss = np.average(train_losses)
+                except:
+                    train_loss = torch.mean(torch.stack(train_losses)).cpu().numpy()
+
+                try:
+                    valid_loss = np.average(val_losses)
+                except:
+                    valid_loss = torch.mean(torch.stack(val_losses)).cpu().numpy()
+
                 val_roc_auc_score = np.average(val_roc_auc_scores_list)
                 val_avg_precision = np.average(val_avg_precision_list)
 

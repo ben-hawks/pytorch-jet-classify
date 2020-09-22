@@ -137,6 +137,11 @@ class three_layer_model_bv_masked(nn.Module):
         self.m2 = masks['fc2']
         self.m3 = masks['fc3']
 
+    def mask_to_device(self, device):
+        self.m1 = self.m1.to(device)
+        self.m2 = self.m2.to(device)
+        self.m3 = self.m3.to(device)
+
     def forward(self, x):
         test = self.fc1(x)
         x = self.act1(test)
@@ -189,6 +194,11 @@ class three_layer_model_bv_batnorm_masked(nn.Module):
         self.m2 = masks['fc2']
         self.m3 = masks['fc3']
 
+    def mask_to_device(self, device):
+        self.m1 = self.m1.to(device)
+        self.m2 = self.m2.to(device)
+        self.m3 = self.m3.to(device)
+
     def forward(self, x):
         test = self.fc1(x)
         x = self.act1(self.bn1(test))
@@ -237,6 +247,11 @@ class three_layer_model_bv_masked_quad(nn.Module):
         self.m1 = masks['fc1']
         self.m2 = masks['fc2']
         self.m3 = masks['fc3']
+
+    def mask_to_device(self, device):
+        self.m1 = self.m1.to(device)
+        self.m2 = self.m2.to(device)
+        self.m3 = self.m3.to(device)
 
     def forward(self, x):
         test = self.fc1(x)
@@ -287,6 +302,11 @@ class three_layer_model_bv_masked_quarter(nn.Module):
         self.m1 = masks['fc1']
         self.m2 = masks['fc2']
         self.m3 = masks['fc3']
+
+    def mask_to_device(self, device):
+        self.m1 = self.m1.to(device)
+        self.m2 = self.m2.to(device)
+        self.m3 = self.m3.to(device)
 
     def forward(self, x):
         test = self.fc1(x)
@@ -354,6 +374,17 @@ class t2_autoencoder_masked(nn.Module):
         self.d2 = masks['dec2']
         self.d3 = masks['dec3']
         self.d4 = masks['dec4']
+
+    def mask_to_device(self, device):
+        self.e1 = self.e1.to(device)
+        self.e2 = self.e2.to(device)
+        self.e3 = self.e3.to(device)
+        self.e4 = self.e4.to(device)
+
+        self.d1 = self.d1.to(device)
+        self.d2 = self.d2.to(device)
+        self.d3 = self.d3.to(device)
+        self.d4 = self.d4.to(device)
 
     def forward(self, x):
 
