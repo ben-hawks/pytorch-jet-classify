@@ -190,7 +190,7 @@ def plot_metric_vs_bitparam(model_set,metric_results_set,bit_params_set,base_met
 
     for model, metric_results, bit_params in zip(model_set, metric_results_set, bit_params_set):
         nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
-        plt.plot(bit_params, prune_roc_results, linestyle='solid', marker='.', alpha=1, label='Pruned {}b'.format(nbits))
+        plt.plot(bit_params, metric_results, linestyle='solid', marker='.', alpha=1, label='Pruned {}b'.format(nbits))
 
     #Plot "base"/unpruned model points
     for model, base_metric in zip(model_set,base_metrics_set):
@@ -241,11 +241,11 @@ if __name__ == "__main__":
 
     (options,args) = parser.parse_args()
     yamlConfig = parse_config(options.config)
-
-    prune_value_set = [438, 438, 438, 438, 438, 438, 438, 438,
+    #3938
+    prune_value_set = [0.10, 0.111, .125, .143, .166, .20, .25, .333, .50, .666, .666,#take ~10% of the "original" value each time, reducing to ~15% original network size
                        0]  # Last 0 is so the final iteration can fine tune before testing
 
-    prune_mask_set = [
+    og_prune_mask_set = [
         {  # Float Model
             "fc1": torch.ones(64, 16),
             "fc2": torch.ones(32, 64),
@@ -256,7 +256,17 @@ if __name__ == "__main__":
             "fc3": torch.ones(32, 32)}
     ]
 
-    model_set = [models.three_layer_model_masked(prune_mask_set[0]), models.three_layer_model_bv_masked(
+    prune_mask_set = [
+        {  # 1/4 Quant Model
+            "fc1": torch.ones(16, 16),
+            "fc2": torch.ones(8, 16),
+            "fc3": torch.ones(8, 8)},
+        {  # 4x Quant Model
+            "fc1": torch.ones(256, 16),
+            "fc2": torch.ones(128, 256),
+            "fc3": torch.ones(128, 128)}
+    ]
+    model_set = [models.three_layer_model_bv_masked_quarter(prune_mask_set[0]), models.three_layer_model_bv_masked_quad(
         prune_mask_set[1])]  # First model should be the "Base" model that all other accuracies are compared to!
 
     # Sets for per-model Results/Data to plot
@@ -308,7 +318,6 @@ if __name__ == "__main__":
                                               shuffle=True, num_workers=0)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=test_size,
                                               shuffle=False, num_workers=0)
-
     for model, prune_mask in zip(model_set, prune_mask_set):
         # Model specific results/data to plot
         prune_results = []
