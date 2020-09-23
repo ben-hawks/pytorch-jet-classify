@@ -124,7 +124,8 @@ def test(model, test_loader, plot=True, pruned_params=0, base_params=0):
             # AUC/Signal Efficiency
             filename = 'ROC_{}b_{}_pruned_{}.png'.format(nbits,pruned_params,time)
 
-            plt.figure()
+            sig_eff_plt = plt.figure()
+            sig_eff_ax = sig_eff_plt.add_subplot()
             for i, label in enumerate(test_dataset.labels_list):
                 df[label] = local_labels[:, i]
                 df[label + '_pred'] = predict_test[:, i]
@@ -132,17 +133,17 @@ def test(model, test_loader, plot=True, pruned_params=0, base_params=0):
                 auc1[label] = auc(fpr[label], tpr[label])
                 plt.plot(tpr[label], fpr[label],
                          label='%s tagger, AUC = %.1f%%' % (label.replace('j_', ''), auc1[label] * 100.))
-            plt.semilogy()
-            plt.xlabel("Signal Efficiency")
-            plt.ylabel("Background Efficiency")
-            plt.ylim(0.001, 1)
-            plt.grid(True)
-            plt.legend(loc='upper left')
-            plt.figtext(0.25, 0.90, '(Pruned {} of {}, {}b)'.format(pruned_params,base_params,nbits),
+            sig_eff_ax.set_yscale('log')
+            sig_eff_ax.set_xlabel("Signal Efficiency")
+            sig_eff_ax.set_ylabel("Background Efficiency")
+            sig_eff_ax.set_ylim(0.001, 1)
+            sig_eff_ax.grid(True)
+            sig_eff_plt.legend(loc='upper left')
+            sig_eff_ax.text(0.25, 0.90, '(Pruned {} of {}, {}b)'.format(pruned_params,base_params,nbits),
                         fontweight='bold',
                         wrap=True, horizontalalignment='right', fontsize=12)
-            plt.savefig(path.join(options.outputDir, filename))
-            plt.show()
+            sig_eff_plt.savefig(path.join(options.outputDir, filename))
+            sig_eff_plt.show()
 
             # Confusion matrix
             filename = 'confMatrix_{}b_{}_pruned_{}.png'.format(nbits,pruned_params,time)
@@ -157,7 +158,8 @@ def test(model, test_loader, plot=True, pruned_params=0, base_params=0):
 
 
 def prune_model(model, amount, prune_mask, method=prune.L1Unstructured):
-
+    model.to('cpu')
+    model.mask_to_device('prune')
     for name, module in model.named_modules():  # re-apply current mask to the model
         if isinstance(module, torch.nn.Linear):
             if name is not "fc4":
@@ -191,22 +193,25 @@ def plot_metric_vs_bitparam(model_set,metric_results_set,bit_params_set,base_met
 
     filename = '{}_vs_bitparams'.format(metric_text) + str(time) + '.png'
 
+    rel_perf_plt = plt.figure()
+    rel_perf_ax = rel_perf_plt.add_subplot()
+
     for model, metric_results, bit_params in zip(model_set, metric_results_set, bit_params_set):
         nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
-        plt.plot(bit_params, metric_results, linestyle='solid', marker='.', alpha=1, label='Pruned {}b'.format(nbits))
+        rel_perf_ax.plot(bit_params, metric_results, linestyle='solid', marker='.', alpha=1, label='Pruned {}b'.format(nbits))
 
     #Plot "base"/unpruned model points
     for model, base_metric in zip(model_set,base_metrics_set):
         # base_metric = [[num_params],[base_metric]]
         nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
-        plt.plot((base_metric[0] * nbits), 1/(base_metric[1]/base_metrics_set[0][1]), linestyle='solid', marker="X", alpha=1, label='Unpruned {}b'.format(nbits))
+        rel_perf_ax.plot((base_metric[0] * nbits), 1/(base_metric[1]/base_metrics_set[0][1]), linestyle='solid', marker="X", alpha=1, label='Unpruned {}b'.format(nbits))
 
-    plt.ylabel("1/{}/FP{}".format(metric_text,metric_text))
-    plt.xlabel("Bit Params (Params * bits)")
-    plt.grid(color='lightgray', linestyle='-', linewidth=1, alpha=0.3)
-    plt.legend(loc='best')
-    plt.savefig(path.join(options.outputDir, filename))
-    plt.show()
+    rel_perf_ax.set_ylabel("1/{}/FP{}".format(metric_text,metric_text))
+    rel_perf_ax.set_xlabel("Bit Params (Params * bits)")
+    rel_perf_ax.grid(color='lightgray', linestyle='-', linewidth=1, alpha=0.3)
+    rel_perf_ax.legend(loc='best')
+    rel_perf_plt.savefig(path.join(options.outputDir, filename))
+    rel_perf_plt.show()
 
 
 def plot_total_loss(model_set, model_totalloss_set, model_estop_set):
@@ -214,21 +219,23 @@ def plot_total_loss(model_set, model_totalloss_set, model_estop_set):
     now = datetime.now()
     time = now.strftime("%d-%m-%Y_%H-%M-%S")
     for model, model_loss, model_estop in zip(model_set, model_totalloss_set, model_estop_set):
+        tloss_plt = plt.figure()
+        tloss_ax = tloss_plt.add_subplot()
         nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
         filename = 'total_loss_{}b_{}.png'.format(nbits,time)
-        plt.plot(range(1, len(model_loss[0]) + 1), model_loss[0], label='Training Loss')
-        plt.plot(range(1, len(model_loss[1]) + 1), model_loss[1], label='Validation Loss')
+        tloss_ax.plot(range(1, len(model_loss[0]) + 1), model_loss[0], label='Training Loss')
+        tloss_ax.plot(range(1, len(model_loss[1]) + 1), model_loss[1], label='Validation Loss')
         # plot each stopping point
         for stop in model_estop:
-            plt.axvline(stop, linestyle='--', color='r', alpha=0.3)
-        plt.xlabel('epochs')
-        plt.ylabel('loss')
-        plt.grid(True)
-        plt.legend(loc='best')
-        plt.title('Total Loss Across pruning & fine tuning {}b model'.format(nbits))
-        plt.tight_layout()
-        plt.savefig(path.join(options.outputDir,filename))
-        plt.show()
+            tloss_ax.axvline(stop, linestyle='--', color='r', alpha=0.3)
+        tloss_ax.set_xlabel('epochs')
+        tloss_ax.set_ylabel('loss')
+        tloss_ax.grid(True)
+        tloss_ax.legend(loc='best')
+        tloss_ax.set_title('Total Loss Across pruning & fine tuning {}b model'.format(nbits))
+        tloss_plt.tight_layout()
+        tloss_plt.savefig(path.join(options.outputDir,filename))
+        tloss_plt.show()
 
 
 if __name__ == "__main__":
@@ -402,8 +409,11 @@ if __name__ == "__main__":
             time = now.strftime("%d-%m-%Y_%H-%M-%S")
 
             # Plot & save losses for this iteration
-            plt.plot(range(1, len(avg_train_losses) + 1), avg_train_losses, label='Training Loss')
-            plt.plot(range(1, len(avg_valid_losses) + 1), avg_valid_losses, label='Validation Loss')
+            loss_plt = plt.figure()
+            loss_ax = loss_plt.add_subplot()
+
+            loss_ax.plot(range(1, len(avg_train_losses) + 1), avg_train_losses, label='Training Loss')
+            loss_ax.plot(range(1, len(avg_valid_losses) + 1), avg_valid_losses, label='Validation Loss')
 
             # find position of lowest validation loss
             if estop:
@@ -420,14 +430,15 @@ if __name__ == "__main__":
             epoch_counter -= ((len(avg_valid_losses)) - minposs)
 
             # Plot losses for this iter
-            plt.axvline(minposs+1, linestyle='--', color='r', label='Early Stopping Checkpoint')
-            plt.xlabel('epochs')
-            plt.ylabel('loss')
-            plt.grid(True)
-            plt.legend()
+
+            loss_ax.axvline(minposs+1, linestyle='--', color='r', label='Early Stopping Checkpoint')
+            loss_ax.set_xlabel('epochs')
+            loss_ax.set_ylabel('loss')
+            loss_ax.grid(True)
+            loss_ax.legend()
             filename = 'loss_plot_e{}_{}_.png'.format(epoch_counter,time)
-            plt.savefig(path.join(options.outputDir + filename), bbox_inches='tight')
-            plt.show()
+            loss_plt.savefig(path.join(options.outputDir + filename), bbox_inches='tight')
+            loss_plt.show()
 
 
             # Prune & Test model
