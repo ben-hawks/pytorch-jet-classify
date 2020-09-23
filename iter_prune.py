@@ -328,6 +328,8 @@ if __name__ == "__main__":
                                               shuffle=True, num_workers=0)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=test_size,
                                               shuffle=False, num_workers=0)
+    base_quant_params = None
+
     for model, prune_mask in zip(model_set, prune_mask_set):
         # Model specific results/data to plot
         prune_results = []
@@ -508,13 +510,17 @@ if __name__ == "__main__":
         model_totalloss_set.append(model_loss)
         model_estop_set.append(model_estop)
 
+    if base_quant_params == None:
+        base_acc_set = [[base_params, base_accuracy_score]]
+        base_roc_set = [[base_params, base_roc_score]]
+    else:
+
+        base_acc_set = [[base_params, base_accuracy_score],
+                        [base_quant_params, base_quant_accuracy_score]]
+
+        base_roc_set = [[base_params, base_roc_score],
+                        [base_quant_params, base_quant_roc_score]]
     # Plot metrics
-    base_acc_set = [[base_params, base_accuracy_score],
-                    [base_quant_params, base_quant_accuracy_score]]
-
-    base_roc_set = [[base_params, base_roc_score],
-                    [base_quant_params, base_quant_roc_score]]
-
     plot_total_loss(model_set, model_totalloss_set, model_estop_set)
     plot_metric_vs_bitparam(model_set,prune_result_set,bit_params_set,base_acc_set,metric_text='ACC')
     plot_metric_vs_bitparam(model_set, prune_result_set, bit_params_set, base_roc_set, metric_text='ROC')
