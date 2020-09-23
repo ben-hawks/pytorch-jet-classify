@@ -159,7 +159,7 @@ def test(model, test_loader, plot=True, pruned_params=0, base_params=0):
 
 def prune_model(model, amount, prune_mask, method=prune.L1Unstructured):
     model.to('cpu')
-    model.mask_to_device('prune')
+    model.mask_to_device('cpu')
     for name, module in model.named_modules():  # re-apply current mask to the model
         if isinstance(module, torch.nn.Linear):
             if name is not "fc4":
