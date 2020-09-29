@@ -138,7 +138,7 @@ def test(model, test_loader, plot=True, pruned_params=0, base_params=0):
             sig_eff_ax.set_ylabel("Background Efficiency")
             sig_eff_ax.set_ylim(0.001, 1)
             sig_eff_ax.grid(True)
-            sig_eff_plt.legend(loc='upper left')
+            sig_eff_ax.legend(loc='upper left')
             sig_eff_ax.text(0.25, 0.90, '(Pruned {} of {}, {}b)'.format(pruned_params,base_params,nbits),
                         fontweight='bold',
                         wrap=True, horizontalalignment='right', fontsize=12)
@@ -295,6 +295,7 @@ if __name__ == "__main__":
     device = torch.device("cuda:0" if use_cuda else "cpu")
     print("Using Device: {}".format(device))
     torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.fastest = True
 
     # Set Batch size and split value
     batch_size = 1024
@@ -322,12 +323,12 @@ if __name__ == "__main__":
 
     # Setup dataloaders with our dataset
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
-                                              shuffle=True, num_workers=0)  # FFS, have to use numworkers = 0 because apparently h5 objects can't be pickled, https://github.com/WuJie1010/Facial-Expression-Recognition.Pytorch/issues/69
+                                              shuffle=True, num_workers=10, pin_memory=True)  # FFS, have to use numworkers = 0 because apparently h5 objects can't be pickled, https://github.com/WuJie1010/Facial-Expression-Recognition.Pytorch/issues/69
 
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
-                                              shuffle=True, num_workers=0)
+                                              shuffle=True, num_workers=10, pin_memory=True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=test_size,
-                                              shuffle=False, num_workers=0)
+                                              shuffle=False, num_workers=10, pin_memory=True)
     base_quant_params = None
 
     for model, prune_mask in zip(model_set, prune_mask_set):

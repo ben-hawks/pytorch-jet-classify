@@ -1,7 +1,7 @@
 import torch
 import pandas as pd
 from torch.utils.data import Dataset
-import h5py
+import h5pickle as h5py
 import io
 import os
 import numpy as np
