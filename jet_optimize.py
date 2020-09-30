@@ -14,6 +14,7 @@ import plot_weights
 from pytorchtools import EarlyStopping
 import copy
 from datetime import datetime
+import os
 import os.path as path
 import ax
 from ax.plot.contour import plot_contour
@@ -22,6 +23,7 @@ from ax.service.managed_loop import optimize
 #from ax.utils.notebook.plotting import render
 from ax.utils.tutorials.cnn_utils import train, evaluate
 
+tested_sizes = []
 
 
 def train(model, optimizer, loss, train_loader, L1_factor=0.0001):
@@ -69,12 +71,13 @@ def val(model, loss, val_loader, L1_factor=0.01):
 
 def create_model(parameterization):
     dims = [parameterization['fc1s'], parameterization['fc2s'], parameterization['fc3s']]
+    tested_sizes.append(dims)
     prune_masks = {
         "fc1": torch.ones(dims[0], 16),
         "fc2": torch.ones(dims[1], dims[0]),
         "fc3": torch.ones(dims[2], dims[1])}
     print("Creating model with the following dims:{}".format(dims))
-    model = models.three_layer_model_bv_tunable(prune_masks, dims)
+    model = models.three_layer_model_bv_tunable(prune_masks, dims, precision=options.bits)
 
     return model
 
@@ -123,6 +126,14 @@ def run_train(model,train_loader,val_loader):
 
     # Load last/best checkpoint model saved via earlystopping
     model.load_state_dict(torch.load('checkpoint.pt'))
+    # Time for filenames
+    now = datetime.now()
+    time = now.strftime("%d-%m-%Y_%H-%M-%S")
+    if not path.exists('{}{}b'.format(options.outputDir, options.bits)):
+        os.makedirs('{}{}b'.format(options.outputDir, options.bits))
+    filename = "{}{}b/BO_{}b_JetModel_{}-{}-{}_{}.pth".format(options.outputDir, options.bits, options.bits, model.dims[0], model.dims[1], model.dims[2],time)
+    print("saving model to {}".format(filename))
+    torch.save(model.state_dict(),filename)
 
     return model
 
@@ -161,6 +172,7 @@ if __name__ == '__main__':
     parser.add_option('-c','--config'   ,action='store',type='string',dest='config'   ,default='configs/train_config_threelayer.yml', help='tree name')
     parser.add_option('-e','--epochs'   ,action='store',type='int', dest='epochs', default=100, help='number of epochs to train for')
     parser.add_option('-p', '--patience', action='store', type='int', dest='patience', default=10,help='Early Stopping patience in epochs')
+    parser.add_option('-b', '--bits', action='store', type='int', dest='bits', default=8, help='Bits of precision to quantize model to')
     (options,args) = parser.parse_args()
     yamlConfig = parse_config(options.config)
 
@@ -219,3 +231,13 @@ if __name__ == '__main__':
     means, covariances = values
     print("Means: {}".format(means))
     print("Covariances: {}".format(covariances))
+
+    # Time for filenames
+    now = datetime.now()
+    time = now.strftime("%d-%m-%Y_%H-%M-%S")
+    results_file = open("{}BO_Results_Summary-{}b_{}".format(options.outputDir,options.bits,time),"a")
+    for sizes in tested_sizes:
+        results_file.write("Tested size: {}\n".format(sizes))
+    results_file.write("Best Params: {}\n".format(best_parameters))
+    results_file.write("Means: {}\n".format(means))
+    results_file.write("Covariances: {}\n".format(covariances))
