@@ -263,7 +263,15 @@ if __name__ == "__main__":
         {  # Quant Model
             "fc1": torch.ones(64, 16),
             "fc2": torch.ones(32, 64),
-            "fc3": torch.ones(32, 32)}
+            "fc3": torch.ones(32, 32)},
+        {  # 1/4 Quant Model
+            "fc1": torch.ones(16, 16),
+            "fc2": torch.ones(8, 16),
+            "fc3": torch.ones(8, 8)},
+        {  # 4x Quant Model
+            "fc1": torch.ones(256, 16),
+            "fc2": torch.ones(128, 256),
+            "fc3": torch.ones(128, 128)}
     ]
 
     scaled_prune_mask_set = [
@@ -276,8 +284,12 @@ if __name__ == "__main__":
             "fc2": torch.ones(128, 256),
             "fc3": torch.ones(128, 128)}
     ]
-    model_set = [models.three_layer_model_bv_batnorm_masked(prune_mask_set[0])]  # First model should be the "Base" model that all other accuracies are compared to!
-
+    # First model should be the "Base" model that all other accuracies are compared to!
+    model_set = [models.three_layer_model_batnorm_masked(prune_mask_set[0]), #32b
+                 models.three_layer_model_bv_batnorm_masked(prune_mask_set[1],4), #4b, 1x
+                 models.three_layer_model_bv_tunable(prune_mask_set[2],[16,8,8]), #1/4x
+                 models.three_layer_model_bv_tunable(prune_mask_set[3],[256,128,128])] #4x
+    print("# Models to train: {}".format(len(model_set)))
     # Sets for per-model Results/Data to plot
     prune_result_set = []
     prune_roc_set = []
@@ -290,7 +302,7 @@ if __name__ == "__main__":
     first_run = True
     first_quant = False
 
-    # Setup cuda, TODO CUDA currently not working, investigate why
+    # Setup cuda
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
     print("Using Device: {}".format(device))
@@ -457,7 +469,7 @@ if __name__ == "__main__":
                 accuracy_score_value_list, roc_auc_score_list = test(model, test_loader, pruned_params=0, base_params=base_params)
                 base_accuracy_score = np.average(accuracy_score_value_list)
                 base_roc_score = np.average(roc_auc_score_list)
-                filename = path.join(options.outputDir, 'weight_dist_{}b_Base.png'.format(nbits, epoch_counter))
+                filename = path.join(options.outputDir, 'weight_dist_{}b_Base_{}.png'.format(nbits, time))
                 plot_weights.plot_kernels(model,
                                           text=' (Unpruned FP Model)',
                                           output=filename)
@@ -471,7 +483,7 @@ if __name__ == "__main__":
                 accuracy_score_value_list, roc_auc_score_list = test(model, test_loader, pruned_params=0, base_params=base_quant_params)
                 base_quant_accuracy_score = np.average(accuracy_score_value_list)
                 base_quant_roc_score = np.average(roc_auc_score_list)
-                filename = path.join(options.outputDir, 'weight_dist_{}b_qBase.png'.format(nbits, epoch_counter))
+                filename = path.join(options.outputDir, 'weight_dist_{}b_qBase_{}.png'.format(nbits, time))
                 plot_weights.plot_kernels(model,
                                           text=' (Unpruned Quant Model)',
                                           output=filename)

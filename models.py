@@ -40,6 +40,50 @@ class three_layer_model_masked(nn.Module):
             return softmax_out
 
 
+class three_layer_model_batnorm_masked(nn.Module):
+    def __init__(self, masks):
+        # Model with <16,64,32,32,5> Behavior
+        self.m1 = masks['fc1']
+        self.m2 = masks['fc2']
+        self.m3 = masks['fc3']
+        super(three_layer_model_batnorm_masked, self).__init__()
+        self.quantized_model = False
+        self.input_shape = 16  # (16,)
+        self.fc1 = nn.Linear(self.input_shape, 64)
+        self.fc2 = nn.Linear(64, 32)
+        self.fc3 = nn.Linear(32, 32)
+        self.fc4 = nn.Linear(32, 5)
+        self.act1 = nn.ReLU()
+        self.act2 = nn.ReLU()
+        self.act3 = nn.ReLU()
+        self.bn1 = nn.BatchNorm1d(64)
+        self.bn2 = nn.BatchNorm1d(32)
+        self.bn3 = nn.BatchNorm1d(32)
+        self.softmax = nn.Softmax(0)
+
+    def update_masks(self, masks):
+        self.m1 = masks['fc1']
+        self.m2 = masks['fc2']
+        self.m3 = masks['fc3']
+
+    def mask_to_device(self, device):
+        self.m1 = self.m1.to(device)
+        self.m2 = self.m2.to(device)
+        self.m3 = self.m3.to(device)
+
+    def forward(self, x):
+        test = self.fc1(x)
+        x = self.act1(self.bn1(test))
+        self.fc1.weight.data.mul_(self.m1)
+        x = self.act2(self.bn2(self.fc2(x)))
+        self.fc2.weight.data.mul_(self.m2)
+        x = self.act3(self.bn3(self.fc3(x)))
+        self.fc3.weight.data.mul_(self.m3)
+        softmax_out = self.softmax(self.fc4(x))
+
+        return softmax_out
+
+
 class three_layer_model(nn.Module):
     def __init__(self):
         # Model with <16,64,32,32,5> Behavior
