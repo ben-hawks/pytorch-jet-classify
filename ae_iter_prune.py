@@ -355,6 +355,8 @@ if __name__ == "__main__":
                 except:
                     valid_loss = torch.mean(torch.stack(val_losses)).cpu().numpy()
 
+                avg_train_losses.append(train_loss)
+                avg_valid_losses.append(valid_loss)
 
                 # Print epoch statistics
                 print('[epoch %d] train batch loss: %.7f' % (epoch + 1, train_loss))
