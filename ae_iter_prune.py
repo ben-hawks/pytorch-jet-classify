@@ -117,6 +117,7 @@ def test(model, test_loaders, plot=True, pruned_params=0, base_params=0):
 def prune_model(model, amount, prune_mask, method=prune.L1Unstructured):
     model.to('cpu')
     model.mask_to_device('cpu')
+    prune_mask.to('cpu')
     for name, module in model.named_modules():  # re-apply current mask to the model
         if isinstance(module, torch.nn.Linear):
             if name is not "dout": #don't prune our final, output layer
@@ -131,7 +132,6 @@ def prune_model(model, amount, prune_mask, method=prune.L1Unstructured):
         (model.dec2, 'weight'),
         (model.dec3, 'weight'),
         (model.dec4, 'weight'),
-        (model.dout, 'weight'),
     )
     prune.global_unstructured(  # global prune the model
         parameters_to_prune,
