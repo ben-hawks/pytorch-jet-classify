@@ -206,11 +206,11 @@ if __name__ == "__main__":
     yamlConfig = parse_config(options.config)
    # prune_value_set = [0.10, 0.111, .125, .143, .166, .20, .25, .333, .50, .666, #take ~10% of the "original" value each time, reducing to ~15% original network size
    #                    0]
-    prune_value_set = [0.10, 0.111,  #take ~10% of the "original" value each time for a verification run
+    prune_value_set = [0.10, 0.111, .125, .143, .166, .20, .25,  #take ~10% of the "original" value each time to ~70%
                        0] # Last 0 is so the final iteration can fine tune before testing
 
     prune_mask_set = [
-        {
+        { #Float 32b
             "enc1":torch.ones(128, 640),
             "enc2":torch.ones(128, 128),
             "enc3":torch.ones(128, 128),
@@ -220,10 +220,22 @@ if __name__ == "__main__":
             "dec3":torch.ones(128, 128),
             "dec4":torch.ones(128, 128),
             "dout":torch.ones(640, 128),
+        },
+        { #Quant 8b
+            "enc1": torch.ones(128, 640),
+            "enc2": torch.ones(128, 128),
+            "enc3": torch.ones(128, 128),
+            "enc4": torch.ones(8, 128),
+            "dec1": torch.ones(128, 8),
+            "dec2": torch.ones(128, 128),
+            "dec3": torch.ones(128, 128),
+            "dec4": torch.ones(128, 128),
+            "dout": torch.ones(640, 128),
         }
     ]
-
-    model_set = [models.t2_autoencoder_masked_bv(prune_mask_set[0],8)]  # First model should be the "Base" model that all other accuracies are compared to!
+    # First model should be the "Base" model that all other accuracies are compared to!
+    model_set = [models.t2_autoencoder_masked(prune_mask_set[0]),
+                 models.t2_autoencoder_masked_bv(prune_mask_set[0], 8)]
 
     # Sets for per-model Results/Data to plot
     prune_result_set = []
