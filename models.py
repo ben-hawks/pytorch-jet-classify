@@ -424,7 +424,13 @@ class three_layer_model_bv_masked_quarter(nn.Module):
 
 class t2_autoencoder_masked(nn.Module):
     def __init__(self,masks):
+        self.input_size = 640
+        self.bottleneck_size = 8
+        self.hidden_size = 128
 
+        self.quantized_model = False
+
+        # Mask setup
         self.e1 = masks['enc1']
         self.e2 = masks['enc2']
         self.e3 = masks['enc3']
@@ -435,35 +441,46 @@ class t2_autoencoder_masked(nn.Module):
         self.d3 = masks['dec3']
         self.d4 = masks['dec4']
 
+        self.do = masks['dout']
+
         super(t2_autoencoder_masked, self).__init__()
 
         # Encoder
-        self.enc1 = nn.Linear(128, 128)
-        self.ebn1 = nn.BatchNorm1d(128)
+        self.enc1 = nn.Linear(self.input_size, self.hidden_size)
+        self.ebn1 = nn.BatchNorm1d(self.hidden_size)
         self.eact1 = nn.ReLU(True)
-        self.enc2= nn.Linear(128, 128)
-        self.ebn2 = nn.BatchNorm1d(128)
+
+        self.enc2= nn.Linear(self.hidden_size, self.hidden_size)
+        self.ebn2 = nn.BatchNorm1d(self.hidden_size)
         self.eact2 = nn.ReLU(True)
-        self.enc3 = nn.Linear(128, 128)
-        self.ebn3 = nn.BatchNorm1d(128)
+
+        self.enc3 = nn.Linear(self.hidden_size, self.hidden_size)
+        self.ebn3 = nn.BatchNorm1d(self.hidden_size)
         self.eact3 = nn.ReLU(True)
-        self.enc4 = nn.Linear(128, 8)
-        self.ebn4 = nn.BatchNorm1d(128)
+
+        self.enc4 = nn.Linear(self.hidden_size, self.bottleneck_size)
+        self.ebn4 = nn.BatchNorm1d(self.bottleneck_size)
         self.eact4 = nn.ReLU(True)
 
         # Decoder
-        self.dec1 = nn.Linear(8, 128)
-        self.dbn1 = nn.BatchNorm1d(128)
+        self.dec1 = nn.Linear(self.bottleneck_size, self.hidden_size)
+        self.dbn1 = nn.BatchNorm1d(self.hidden_size)
         self.dact1 = nn.ReLU(True)
-        self.dec2= nn.Linear(128, 128)
-        self.dbn2 = nn.BatchNorm1d(128)
+
+        self.dec2= nn.Linear(self.hidden_size, self.hidden_size)
+        self.dbn2 = nn.BatchNorm1d(self.hidden_size)
         self.dact2 = nn.ReLU(True)
-        self.dec3 = nn.Linear(128, 128)
-        self.dbn3 = nn.BatchNorm1d(128)
+
+        self.dec3 = nn.Linear(self.hidden_size, self.hidden_size)
+        self.dbn3 = nn.BatchNorm1d(self.hidden_size)
         self.dact3 = nn.ReLU(True)
-        self.dec4 = nn.Linear(128, 128)
-        self.dbn4 = nn.BatchNorm1d(128)
+
+        self.dec4 = nn.Linear(self.hidden_size, self.hidden_size)
+        self.dbn4 = nn.BatchNorm1d(self.hidden_size)
         self.dact4 = nn.ReLU(True)
+
+        #Output
+        self.dout = nn.Linear(self.hidden_size,self.input_size)
 
     def update_masks(self, masks):
         self.e1 = masks['enc1']
@@ -476,6 +493,8 @@ class t2_autoencoder_masked(nn.Module):
         self.d3 = masks['dec3']
         self.d4 = masks['dec4']
 
+        self.do = masks['dout']
+
     def mask_to_device(self, device):
         self.e1 = self.e1.to(device)
         self.e2 = self.e2.to(device)
@@ -486,6 +505,8 @@ class t2_autoencoder_masked(nn.Module):
         self.d2 = self.d2.to(device)
         self.d3 = self.d3.to(device)
         self.d4 = self.d4.to(device)
+
+        self.do = self.do.to(device)
 
     def forward(self, x):
 
@@ -508,4 +529,151 @@ class t2_autoencoder_masked(nn.Module):
         self.dec3.weight.data.mul_(self.d3)
         x = self.dact4(self.dbn4(self.dec4(x)))
         self.dec4.weight.data.mul_(self.d4)
+
+        #Output Layer
+        x = self.dout(x)
+        self.dout.weight.data.mul_(self.do)
+
+        return x
+
+class t2_autoencoder_masked_bv(nn.Module):
+    def __init__(self,masks,precision=8):
+        self.weight_precision = precision
+        self.quantized_model = True
+
+        self.e1 = masks['enc1']
+        self.e2 = masks['enc2']
+        self.e3 = masks['enc3']
+        self.e4 = masks['enc4']
+
+        self.d1 = masks['dec1']
+        self.d2 = masks['dec2']
+        self.d3 = masks['dec3']
+        self.d4 = masks['dec4']
+
+        self.do = masks['dout']
+
+        super(t2_autoencoder_masked_bv, self).__init__()
+
+        self.input_size = 640
+        self.bottleneck_size = 8
+        self.hidden_size = 128
+
+        # Encoder
+        self.enc1 = qnn.QuantLinear(self.input_size, self.hidden_size,
+                                   bias=True,
+                                   weight_quant_type=QuantType.INT,
+                                   weight_bit_width=self.weight_precision)
+        self.ebn1 = nn.BatchNorm1d(self.hidden_size)
+        self.eact1 = qnn.QuantReLU(quant_type=QuantType.INT, bit_width=self.weight_precision, max_val=6)
+
+        self.enc2= qnn.QuantLinear(self.hidden_size, self.hidden_size,
+                                   bias=True,
+                                   weight_quant_type=QuantType.INT,
+                                   weight_bit_width=self.weight_precision)
+        self.ebn2 = nn.BatchNorm1d(self.hidden_size)
+        self.eact2 = qnn.QuantReLU(quant_type=QuantType.INT, bit_width=self.weight_precision, max_val=6)
+
+        self.enc3 = qnn.QuantLinear(self.hidden_size, self.hidden_size,
+                                   bias=True,
+                                   weight_quant_type=QuantType.INT,
+                                   weight_bit_width=self.weight_precision)
+        self.ebn3 = nn.BatchNorm1d(self.hidden_size)
+        self.eact3 = qnn.QuantReLU(quant_type=QuantType.INT, bit_width=self.weight_precision, max_val=6)
+
+        self.enc4 = qnn.QuantLinear(self.hidden_size, self.bottleneck_size,
+                                   bias=True,
+                                   weight_quant_type=QuantType.INT,
+                                   weight_bit_width=self.weight_precision)
+        self.ebn4 = nn.BatchNorm1d(self.bottleneck_size)
+        self.eact4 = qnn.QuantReLU(quant_type=QuantType.INT, bit_width=self.weight_precision, max_val=6)
+
+        # Decoder
+        self.dec1 = qnn.QuantLinear(self.bottleneck_size, self.hidden_size,
+                                   bias=True,
+                                   weight_quant_type=QuantType.INT,
+                                   weight_bit_width=self.weight_precision)
+        self.dbn1 = nn.BatchNorm1d(self.hidden_size)
+        self.dact1 = qnn.QuantReLU(quant_type=QuantType.INT, bit_width=self.weight_precision, max_val=6)
+
+        self.dec2= qnn.QuantLinear(self.hidden_size, self.hidden_size,
+                                   bias=True,
+                                   weight_quant_type=QuantType.INT,
+                                   weight_bit_width=self.weight_precision)
+        self.dbn2 = nn.BatchNorm1d(self.hidden_size)
+        self.dact2 = qnn.QuantReLU(quant_type=QuantType.INT, bit_width=self.weight_precision, max_val=6)
+
+        self.dec3 = qnn.QuantLinear(self.hidden_size, self.hidden_size,
+                                   bias=True,
+                                   weight_quant_type=QuantType.INT,
+                                   weight_bit_width=self.weight_precision)
+        self.dbn3 = nn.BatchNorm1d(self.hidden_size)
+        self.dact3 = qnn.QuantReLU(quant_type=QuantType.INT, bit_width=self.weight_precision, max_val=6)
+
+        self.dec4 = qnn.QuantLinear(self.hidden_size, self.hidden_size,
+                                   bias=True,
+                                   weight_quant_type=QuantType.INT,
+                                   weight_bit_width=self.weight_precision)
+        self.dbn4 = nn.BatchNorm1d(self.hidden_size)
+        self.dact4 = qnn.QuantReLU(quant_type=QuantType.INT, bit_width=self.weight_precision, max_val=6)
+
+        # Output
+        self.dout = qnn.QuantLinear(self.hidden_size, self.input_size,
+                                   bias=True,
+                                   weight_quant_type=QuantType.INT,
+                                   weight_bit_width=self.weight_precision)
+
+
+    def update_masks(self, masks):
+        self.e1 = masks['enc1']
+        self.e2 = masks['enc2']
+        self.e3 = masks['enc3']
+        self.e4 = masks['enc4']
+
+        self.d1 = masks['dec1']
+        self.d2 = masks['dec2']
+        self.d3 = masks['dec3']
+        self.d4 = masks['dec4']
+
+        self.do = masks['dout']
+
+    def mask_to_device(self, device):
+        self.e1 = self.e1.to(device)
+        self.e2 = self.e2.to(device)
+        self.e3 = self.e3.to(device)
+        self.e4 = self.e4.to(device)
+
+        self.d1 = self.d1.to(device)
+        self.d2 = self.d2.to(device)
+        self.d3 = self.d3.to(device)
+        self.d4 = self.d4.to(device)
+
+        self.do = self.do.to(device)
+
+    def forward(self, x):
+
+        # Encoder Pass
+        x = self.eact1(self.ebn1(self.enc1(x)))
+        self.enc1.weight.data.mul_(self.e1)
+        x = self.eact2(self.ebn2(self.enc2(x)))
+        self.enc2.weight.data.mul_(self.e2)
+        x = self.eact3(self.ebn3(self.enc3(x)))
+        self.enc3.weight.data.mul_(self.e3)
+        x = self.eact4(self.ebn4(self.enc4(x)))
+        self.enc4.weight.data.mul_(self.e4)
+
+        # Decoder Pass
+        x = self.dact1(self.dbn1(self.dec1(x)))
+        self.dec1.weight.data.mul_(self.d1)
+        x = self.dact2(self.dbn2(self.dec2(x)))
+        self.dec2.weight.data.mul_(self.d2)
+        x = self.dact3(self.dbn3(self.dec3(x)))
+        self.dec3.weight.data.mul_(self.d3)
+        x = self.dact4(self.dbn4(self.dec4(x)))
+        self.dec4.weight.data.mul_(self.d4)
+
+        #Output Layer
+        x = self.dout(x)
+        self.dout.weight.data.mul_(self.do)
+
         return x
