@@ -50,6 +50,8 @@ def l1_regularizer(model, lambda_l1=0.01):
     return lossl1
 
 def train(model, optimizer, loss, train_loader, L1_factor=0.0001):
+    model.to(device)
+    model.mask_to_device(device)
     train_losses = []
     for i, data in enumerate(train_loader, 0):
         local_batch, local_labels = data #in AE Wav datset, labels and data are the same thing for convience
@@ -58,6 +60,7 @@ def train(model, optimizer, loss, train_loader, L1_factor=0.0001):
         # forward + backward + optimize
         optimizer.zero_grad()
         outputs = model(local_batch.float())
+        outputs.to(device)
         criterion_loss = loss(outputs, local_labels.float())
         reg_loss = 0 #Autoencoder doesn't need regularization
         total_loss = criterion_loss + reg_loss
@@ -72,6 +75,7 @@ def val(model, loss, val_loader, L1_factor=0.01):
     val_roc_auc_scores_list = []
     val_avg_precision_list = []
     val_losses = []
+    model.to(device)
     with torch.set_grad_enabled(False):
         model.eval()
         for i, data in enumerate(val_loader, 0):
@@ -111,7 +115,8 @@ def test(model, test_loaders, plot=True, pruned_params=0, base_params=0):
 
 
 def prune_model(model, amount, prune_mask, method=prune.L1Unstructured):
-
+    model.to('cpu')
+    model.mask_to_device('cpu')
     for name, module in model.named_modules():  # re-apply current mask to the model
         if isinstance(module, torch.nn.Linear):
             if name is not "dout": #don't prune our final, output layer
@@ -250,7 +255,7 @@ if __name__ == "__main__":
     first_quant = False
 
     # Setup cuda, TODO CUDA currently not working, investigate why
-    use_cuda = False  # torch.cuda.is_available()
+    use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
