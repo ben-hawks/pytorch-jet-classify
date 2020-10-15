@@ -325,6 +325,9 @@ if __name__ == "__main__":
 
             optimizer = optim.Adam(model.parameters(), lr=0.001) #Stock DCASE2020 T2 LR is 0.001
             criterion = nn.MSELoss() #Keras model uses MSE
+            LRScheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,mode='min',factor=0.5,
+                                                               patience=1,verbose=True,eps=0.001,
+                                                               cooldown=4,min_lr=1e-5)
 
             L1_factor = 0.0001  # Default Keras L1 Loss
             estop = False
@@ -344,6 +347,7 @@ if __name__ == "__main__":
                 # Validate
                 val_losses = val(model, criterion, val_loader, L1_factor=L1_factor)
 
+
                 # Calculate average epoch statistics
                 try:
                     train_loss = np.average(train_losses)
@@ -357,6 +361,8 @@ if __name__ == "__main__":
 
                 avg_train_losses.append(train_loss)
                 avg_valid_losses.append(valid_loss)
+
+                LRScheduler.step(valid_loss)
 
                 # Print epoch statistics
                 print('[epoch %d] train batch loss: %.7f' % (epoch + 1, train_loss))
