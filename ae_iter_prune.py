@@ -291,16 +291,16 @@ if __name__ == "__main__":
 
     # Setup dataloaders with our dataset
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
-                                              shuffle=True, num_workers=0)
+                                              shuffle=True, num_workers=10, pin_memory=True)
 
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
-                                              shuffle=True, num_workers=0)
+                                              shuffle=True, num_workers=10, pin_memory=True)
     test_loader_01 = torch.utils.data.DataLoader(test_dataset_01, batch_size=test_size1,
-                                              shuffle=True, num_workers=0)
+                                              shuffle=True, num_workers=10, pin_memory=True)
     test_loader_03 = torch.utils.data.DataLoader(test_dataset_03, batch_size=test_size3,
-                                              shuffle=True, num_workers=0)
+                                              shuffle=True, num_workers=10, pin_memory=True)
     test_loader_05 = torch.utils.data.DataLoader(test_dataset_05, batch_size=test_size5,
-                                              shuffle=True, num_workers=0)
+                                              shuffle=True, num_workers=10, pin_memory=True)
 
     for model, prune_mask in zip(model_set, prune_mask_set):
         # Model specific results/data to plot
@@ -345,8 +345,15 @@ if __name__ == "__main__":
                 val_losses = val(model, criterion, val_loader, L1_factor=L1_factor)
 
                 # Calculate average epoch statistics
-                train_loss = np.average(train_losses)
-                valid_loss = np.average(val_losses)
+                try:
+                    train_loss = np.average(train_losses)
+                except:
+                    train_loss = torch.mean(torch.stack(train_losses)).cpu().numpy()
+
+                try:
+                    valid_loss = np.average(val_losses)
+                except:
+                    valid_loss = torch.mean(torch.stack(val_losses)).cpu().numpy()
 
 
                 # Print epoch statistics
