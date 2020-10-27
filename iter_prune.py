@@ -478,7 +478,7 @@ if __name__ == "__main__":
             loss_ax.grid(True)
             loss_ax.legend()
             filename = 'loss_plot_e{}_{}_.png'.format(epoch_counter,time)
-            loss_plt.savefig(path.join(options.outputDir + filename), bbox_inches='tight')
+            loss_plt.savefig(path.join(options.outputDir, filename), bbox_inches='tight')
             loss_plt.show()
 
 
