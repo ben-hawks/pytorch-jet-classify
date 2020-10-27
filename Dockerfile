@@ -8,7 +8,8 @@ ENV USER=${NB_USER}
 
 RUN set -x \
     && pip install llvmlite --ignore-installed \
-    && pip install torchsummaryX 
+    && pip install torchsummaryX \
+    && pip install git+https://github.com/Xilinx/brevitas.git
 
 
 RUN set -x \
