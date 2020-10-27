@@ -264,14 +264,18 @@ if __name__ == "__main__":
             "fc1": torch.ones(64, 16),
             "fc2": torch.ones(32, 64),
             "fc3": torch.ones(32, 32)},
-        {  # 1/4 Quant Model
-            "fc1": torch.ones(16, 16),
-            "fc2": torch.ones(8, 16),
-            "fc3": torch.ones(8, 8)},
-        {  # 4x Quant Model
-            "fc1": torch.ones(256, 16),
-            "fc2": torch.ones(128, 256),
-            "fc3": torch.ones(128, 128)}
+        {  # Quant Model
+            "fc1": torch.ones(64, 16),
+            "fc2": torch.ones(32, 64),
+            "fc3": torch.ones(32, 32)},
+        {  # Quant Model
+            "fc1": torch.ones(64, 16),
+            "fc2": torch.ones(32, 64),
+            "fc3": torch.ones(32, 32)},
+        {  # Quant Model
+            "fc1": torch.ones(64, 16),
+            "fc2": torch.ones(32, 64),
+            "fc3": torch.ones(32, 32)},
     ]
 
     scaled_prune_mask_set = [
@@ -285,10 +289,25 @@ if __name__ == "__main__":
             "fc3": torch.ones(128, 128)}
     ]
     # First model should be the "Base" model that all other accuracies are compared to!
+
+    if options.lottery:
+        # fix seed
+        torch.manual_seed(yamlConfig["Seed"])
+        torch.cuda.manual_seed_all(yamlConfig["Seed"]) #seeds all GPUs, just in case there's more than one
+        np.random.seed(yamlConfig["Seed"])
+
     model_set = [models.three_layer_model_batnorm_masked(prune_mask_set[0]), #32b
-                 models.three_layer_model_bv_batnorm_masked(prune_mask_set[1],4), #4b, 1x
-                 models.three_layer_model_bv_tunable(prune_mask_set[2],[16,8,8]), #1/4x
-                 models.three_layer_model_bv_tunable(prune_mask_set[3],[256,128,128])] #4x
+                 models.three_layer_model_bv_batnorm_masked(prune_mask_set[1],12), #12b
+                 models.three_layer_model_bv_batnorm_masked(prune_mask_set[2],8), #8b
+                 models.three_layer_model_bv_batnorm_masked(prune_mask_set[3],6), #6b
+                 models.three_layer_model_bv_batnorm_masked(prune_mask_set[4],4)] #4x
+
+    #save initalizations in case we're doing Lottery Ticket
+    inital_models_sd = []
+    for model in model_set:
+        inital_models_sd.append(model.state_dict())
+
+
     print("# Models to train: {}".format(len(model_set)))
     # Sets for per-model Results/Data to plot
     prune_result_set = []
@@ -306,8 +325,15 @@ if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
     print("Using Device: {}".format(device))
-    torch.backends.cudnn.benchmark = True
-    torch.backends.cudnn.fastest = True
+
+    if options.lottery:
+        torch.backends.cudnn.enabled = True
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    else:
+        torch.backends.cudnn.enabled = True
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.fastest = True
 
     # Set Batch size and split value
     batch_size = 1024
@@ -343,7 +369,7 @@ if __name__ == "__main__":
                                               shuffle=False, num_workers=10, pin_memory=True)
     base_quant_params = None
 
-    for model, prune_mask in zip(model_set, prune_mask_set):
+    for model, prune_mask, init_sd in zip(model_set, prune_mask_set, inital_models_sd):
         # Model specific results/data to plot
         prune_results = []
         prune_roc_results = []
@@ -371,11 +397,11 @@ if __name__ == "__main__":
             estop = False
 
             if options.lottery:  # If using lottery ticket method, reset all weights to first initalized vals
-                for name, module in model.named_children():  # TODO Not working right now? Need to investigate implementation, dont use
-                    if isinstance(module, nn.Linear):
-                        print('resetting ', name)
-                        # torch.manual_seed(42) #Placeholder for now, dont actually rely on until verified
-                        # module.reset_parameters()
+                print("Resetting Model to Inital State dict with masks applied. Verifying via param count.")
+                model.load_state_dict(init_sd)
+                model.update_masks(prune_mask)
+                model.force_mask_apply()
+                countNonZeroWeights(model)
 
             for epoch in range(options.epochs):  # loop over the dataset multiple times
                 epoch_counter += 1

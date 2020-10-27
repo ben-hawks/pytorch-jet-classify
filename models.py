@@ -28,6 +28,11 @@ class three_layer_model_masked(nn.Module):
             self.m2 = masks['fc2']
             self.m3 = masks['fc3']
 
+        def force_mask_apply(self):
+            self.fc1.weight.data.mul_(self.m1)
+            self.fc2.weight.data.mul_(self.m2)
+            self.fc3.weight.data.mul_(self.m3)
+
         def forward(self, x):
             x = self.act1(self.fc1(x))
             self.fc1.weight.data.mul_(self.m1)
@@ -70,6 +75,11 @@ class three_layer_model_batnorm_masked(nn.Module):
         self.m1 = self.m1.to(device)
         self.m2 = self.m2.to(device)
         self.m3 = self.m3.to(device)
+
+    def force_mask_apply(self):
+        self.fc1.weight.data.mul_(self.m1)
+        self.fc2.weight.data.mul_(self.m2)
+        self.fc3.weight.data.mul_(self.m3)
 
     def forward(self, x):
         test = self.fc1(x)
@@ -186,6 +196,11 @@ class three_layer_model_bv_masked(nn.Module):
         self.m2 = self.m2.to(device)
         self.m3 = self.m3.to(device)
 
+    def force_mask_apply(self):
+        self.fc1.weight.data.mul_(self.m1)
+        self.fc2.weight.data.mul_(self.m2)
+        self.fc3.weight.data.mul_(self.m3)
+
     def forward(self, x):
         test = self.fc1(x)
         x = self.act1(test)
@@ -242,6 +257,11 @@ class three_layer_model_bv_batnorm_masked(nn.Module):
         self.m1 = self.m1.to(device)
         self.m2 = self.m2.to(device)
         self.m3 = self.m3.to(device)
+
+    def force_mask_apply(self):
+        self.fc1.weight.data.mul_(self.m1)
+        self.fc2.weight.data.mul_(self.m2)
+        self.fc3.weight.data.mul_(self.m3)
 
     def forward(self, x):
         test = self.fc1(x)
@@ -300,6 +320,11 @@ class three_layer_model_bv_tunable(nn.Module):
         self.m1 = self.m1.to(device)
         self.m2 = self.m2.to(device)
         self.m3 = self.m3.to(device)
+
+    def force_mask_apply(self):
+        self.fc1.weight.data.mul_(self.m1)
+        self.fc2.weight.data.mul_(self.m2)
+        self.fc3.weight.data.mul_(self.m3)
 
     def forward(self, x):
         test = self.fc1(x)
@@ -508,6 +533,22 @@ class t2_autoencoder_masked(nn.Module):
 
         self.do = self.do.to(device)
 
+    def force_mask_apply(self):
+        # Encoder Pass
+        self.enc1.weight.data.mul_(self.e1)
+        self.enc2.weight.data.mul_(self.e2)
+        self.enc3.weight.data.mul_(self.e3)
+        self.enc4.weight.data.mul_(self.e4)
+
+        # Decoder Pass
+        self.dec1.weight.data.mul_(self.d1)
+        self.dec2.weight.data.mul_(self.d2)
+        self.dec3.weight.data.mul_(self.d3)
+        self.dec4.weight.data.mul_(self.d4)
+
+        # Output Layer
+        self.dout.weight.data.mul_(self.do)
+
     def forward(self, x):
 
         # Encoder Pass
@@ -649,6 +690,22 @@ class t2_autoencoder_masked_bv(nn.Module):
         self.d4 = self.d4.to(device)
 
         self.do = self.do.to(device)
+
+    def force_mask_apply(self):
+        # Encoder Pass
+        self.enc1.weight.data.mul_(self.e1)
+        self.enc2.weight.data.mul_(self.e2)
+        self.enc3.weight.data.mul_(self.e3)
+        self.enc4.weight.data.mul_(self.e4)
+
+        # Decoder Pass
+        self.dec1.weight.data.mul_(self.d1)
+        self.dec2.weight.data.mul_(self.d2)
+        self.dec3.weight.data.mul_(self.d3)
+        self.dec4.weight.data.mul_(self.d4)
+
+        # Output Layer
+        self.dout.weight.data.mul_(self.do)
 
     def forward(self, x):
 
