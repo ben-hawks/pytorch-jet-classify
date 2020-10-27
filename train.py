@@ -15,6 +15,7 @@ import seaborn as sn
 import plot_weights
 import copy
 from datetime import datetime
+import os
 
 ## Config module
 def parse_config(config_file) :
@@ -131,6 +132,7 @@ if __name__ == "__main__":
                     val_losses.append(val_loss)
                     roc_auc_scores.append(val_roc_auc_score)
                     avg_precision_scores.append(val_avg_precision)
+    os.makedirs(options.outputDir,exist_ok=True)
     now = datetime.now()
     time = now.strftime("%d-%m-%Y_%H-%M-%S")
     print("ROC AUC Table size: " + str(len(roc_auc_scores)))
@@ -221,7 +223,9 @@ if __name__ == "__main__":
     print(class_accuracy)
 
     torch.save(current_model.state_dict(), options.outputDir + 'JetClassifyModel_' + str(time) + '.pt')
-    plot_weights.plot_kernels(current_model,text=" (Locally Pruned)")
+    os.makedirs(options.outputDir+'weight_dists/',exist_ok=True)
+    plot_weights.plot_kernels(current_model,text=" (Locally Pruned)",
+                              output=options.outputDir+'weight_dists/'+'weight_dist_' + str(time) + '.png')
 
 
     print('Finished Training')

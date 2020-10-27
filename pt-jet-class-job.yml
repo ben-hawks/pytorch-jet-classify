@@ -1,0 +1,61 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pt-jet-class-job-baseline
+  labels:
+    jobgroup: pt-jet-class-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: postprocessing
+        image:  gitlab-registry.nautilus.optiputer.net/jmduarte/pytorch-jet-classify:latest
+        command:
+        - "python"
+        args:
+        - /opt/repo/pytorch-jet-classify/train.py
+        - -i
+        - /ptjetclassvol/train_data/train/
+        - -t
+        - /ptjetclassvol/train_data/test/
+        - -c
+        - /opt/repo/pytorch-jet-classify/configs/train_config_threelayer.yml
+        - -e
+        - "2"
+        - -o
+        - /ptjetclassvol/models/baseline/
+        volumeMounts:
+        - mountPath: /ptjetclassvol
+          name: pt-jet-class-vol
+        - name: git-repo
+          mountPath: /opt/repo
+        resources:
+          limits:
+            memory: 16Gi
+            cpu: "4"
+            nvidia.com/gpu: "1"
+          requests:
+            memory: 4Gi
+            cpu: "1"
+            nvidia.com/gpu: "1"
+      initContainers:
+      - name: init-clone-repo
+        image: alpine/git
+        args:
+          - clone
+          - --single-branch
+          - https://github.com/jmduarte/pytorch-jet-classify
+          - -b
+          - master
+          - /opt/repo/pytorch-jet-classify
+        volumeMounts:
+          - name: git-repo
+            mountPath: /opt/repo
+      volumes:
+      - name: git-repo
+        emptyDir: {}
+      - name: pt-jet-class-vol
+        persistentVolumeClaim:
+          claimName: pt-jet-class-vol
+      restartPolicy: Never
+  backoffLimit: 5
