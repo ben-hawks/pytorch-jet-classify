@@ -26,6 +26,7 @@ def plot_kernels(model, text="", output=None):
     weight_ax.set_ylabel("Number of Weights")
     weight_ax.set_xlabel("Absolute Weights")
     if output is None:
+        os.makedirs('weight_dists/',exist_ok=True)
         output = os.path.join('weight_dists/', ('weight_dist_' + str(time) + '.png'))
     weight_plt.savefig(output)
     weight_plt.show()
