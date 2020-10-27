@@ -41,7 +41,7 @@ cd /ptjetclassvol/
 mkdir data
 wget https://raw.githubusercontent.com/ben-hawks/pytorch-jet-classify/master/jet_data_download.sh
 source jet_data_download.sh
-``
+```
 
 To check on running pods:
 ```
