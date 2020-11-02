@@ -58,7 +58,10 @@ def train(model, optimizer, loss, train_loader, L1_factor=0.0001):
         optimizer.zero_grad()
         outputs = model(local_batch.float())
         criterion_loss = loss(outputs, local_labels.float())
-        reg_loss = l1_regularizer(model, lambda_l1=L1_factor)
+        if not options.l1reg:
+            reg_loss = l1_regularizer(model, lambda_l1=L1_factor)
+        else:
+            reg_loss = 0
         total_loss = criterion_loss + reg_loss
         total_loss.backward()
         optimizer.step()
@@ -162,13 +165,14 @@ def prune_model(model, amount, prune_mask, method=prune.L1Unstructured):
     model.mask_to_device('cpu')
     for name, module in model.named_modules():  # re-apply current mask to the model
         if isinstance(module, torch.nn.Linear):
-            if name is not "fc4":
-                prune.custom_from_mask(module, "weight", prune_mask[name])
+#            if name is not "fc4":
+             prune.custom_from_mask(module, "weight", prune_mask[name])
 
     parameters_to_prune = (
         (model.fc1, 'weight'),
         (model.fc2, 'weight'),
         (model.fc3, 'weight'),
+        (model.fc4, 'weight'),
     )
     prune.global_unstructured(  # global prune the model
         parameters_to_prune,
@@ -178,10 +182,10 @@ def prune_model(model, amount, prune_mask, method=prune.L1Unstructured):
 
     for name, module in model.named_modules():  # make pruning "permanant" by removing the orig/mask values from the state dict
         if isinstance(module, torch.nn.Linear):
-            if name is not "fc4":
-                torch.logical_and(module.weight_mask, prune_mask[name],
-                                  out=prune_mask[name])  # Update progress mask
-                prune.remove(module, 'weight')  # remove all those values in the global pruned model
+#            if name is not "fc4":
+            torch.logical_and(module.weight_mask, prune_mask[name],
+                              out=prune_mask[name])  # Update progress mask
+            prune.remove(module, 'weight')  # remove all those values in the global pruned model
 
     return model
 
@@ -248,7 +252,10 @@ if __name__ == "__main__":
     parser.add_option('-e','--epochs'   ,action='store',type='int', dest='epochs', default=100, help='number of epochs to train for')
     parser.add_option('-p', '--patience', action='store', type='int', dest='patience', default=10,help='Early Stopping patience in epochs')
     parser.add_option('-L', '--lottery', action='store_true', dest='lottery', default=False, help='Prune and Train using the Lottery Ticket Hypothesis')
-
+    parser.add_option('-a', '--no_bn_affine', action='store_true', dest='bn_affine', default=False, help='disable BN Affine Parameters')
+    parser.add_option('-s', '--no_bn_stats', action='store_true', dest='bn_stats', default=False, help='disable BN running statistics')
+    parser.add_option('-b', '--no_batnorm', action='store_true', dest='batnorm', default=False, help='disable BatchNormalization (BN) Layers ')
+    parser.add_option('-r', '--no_l1reg', action='store_true', dest='l1reg', default=False, help='disable L1 Regularization totally ')
     (options,args) = parser.parse_args()
     yamlConfig = parse_config(options.config)
     #3938
@@ -259,23 +266,28 @@ if __name__ == "__main__":
         {  # Float Model
             "fc1": torch.ones(64, 16),
             "fc2": torch.ones(32, 64),
-            "fc3": torch.ones(32, 32)},
+            "fc3": torch.ones(32, 32),
+            "fc4": torch.ones(5, 32)},
         {  # Quant Model
             "fc1": torch.ones(64, 16),
             "fc2": torch.ones(32, 64),
-            "fc3": torch.ones(32, 32)},
+            "fc3": torch.ones(32, 32),
+            "fc4": torch.ones(5, 32)},
         {  # Quant Model
             "fc1": torch.ones(64, 16),
             "fc2": torch.ones(32, 64),
-            "fc3": torch.ones(32, 32)},
+            "fc3": torch.ones(32, 32),
+            "fc4": torch.ones(5, 32)},
         {  # Quant Model
             "fc1": torch.ones(64, 16),
             "fc2": torch.ones(32, 64),
-            "fc3": torch.ones(32, 32)},
+            "fc3": torch.ones(32, 32),
+            "fc4": torch.ones(5, 32)},
         {  # Quant Model
             "fc1": torch.ones(64, 16),
             "fc2": torch.ones(32, 64),
-            "fc3": torch.ones(32, 32)},
+            "fc3": torch.ones(32, 32),
+            "fc4": torch.ones(5, 32)},
     ]
 
     scaled_prune_mask_set = [
@@ -295,12 +307,19 @@ if __name__ == "__main__":
         torch.manual_seed(yamlConfig["Seed"])
         torch.cuda.manual_seed_all(yamlConfig["Seed"]) #seeds all GPUs, just in case there's more than one
         np.random.seed(yamlConfig["Seed"])
+    if options.no_batnorm:
+        model_set = [models.three_layer_model_masked(prune_mask_set[0]), #32b
+                     models.three_layer_model_bv_masked(prune_mask_set[1],12), #12b
+                     models.three_layer_model_bv_masked(prune_mask_set[2],8), #8b
+                     models.three_layer_model_bv_masked(prune_mask_set[3],6), #6b
+                     models.three_layer_model_bv_masked(prune_mask_set[4],4)] #4x
+    else:
+        model_set = [models.three_layer_model_batnorm_masked(prune_mask_set[0], bn_affine=options.bn_affine, bn_stats=options.bn_stats), #32b
+                     models.three_layer_model_bv_batnorm_masked(prune_mask_set[1],12, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #12b
+                     models.three_layer_model_bv_batnorm_masked(prune_mask_set[2],8, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #8b
+                     models.three_layer_model_bv_batnorm_masked(prune_mask_set[3],6, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #6b
+                     models.three_layer_model_bv_batnorm_masked(prune_mask_set[4],4, bn_affine=options.bn_affine, bn_stats=options.bn_stats)] #4x
 
-    model_set = [models.three_layer_model_batnorm_masked(prune_mask_set[0]), #32b
-                 models.three_layer_model_bv_batnorm_masked(prune_mask_set[1],12), #12b
-                 models.three_layer_model_bv_batnorm_masked(prune_mask_set[2],8), #8b
-                 models.three_layer_model_bv_batnorm_masked(prune_mask_set[3],6), #6b
-                 models.three_layer_model_bv_batnorm_masked(prune_mask_set[4],4)] #4x
 
     #save initalizations in case we're doing Lottery Ticket
     inital_models_sd = []
