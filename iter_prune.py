@@ -252,8 +252,8 @@ if __name__ == "__main__":
     parser.add_option('-e','--epochs'   ,action='store',type='int', dest='epochs', default=100, help='number of epochs to train for')
     parser.add_option('-p', '--patience', action='store', type='int', dest='patience', default=10,help='Early Stopping patience in epochs')
     parser.add_option('-L', '--lottery', action='store_true', dest='lottery', default=False, help='Prune and Train using the Lottery Ticket Hypothesis')
-    parser.add_option('-a', '--no_bn_affine', action='store_true', dest='bn_affine', default=False, help='disable BN Affine Parameters')
-    parser.add_option('-s', '--no_bn_stats', action='store_true', dest='bn_stats', default=False, help='disable BN running statistics')
+    parser.add_option('-a', '--no_bn_affine', action='store_false', dest='bn_affine', default=True, help='disable BN Affine Parameters')
+    parser.add_option('-s', '--no_bn_stats', action='store_false', dest='bn_stats', default=True, help='disable BN running statistics')
     parser.add_option('-b', '--no_batnorm', action='store_true', dest='batnorm', default=False, help='disable BatchNormalization (BN) Layers ')
     parser.add_option('-r', '--no_l1reg', action='store_true', dest='l1reg', default=False, help='disable L1 Regularization totally ')
     (options,args) = parser.parse_args()
@@ -307,19 +307,18 @@ if __name__ == "__main__":
         torch.manual_seed(yamlConfig["Seed"])
         torch.cuda.manual_seed_all(yamlConfig["Seed"]) #seeds all GPUs, just in case there's more than one
         np.random.seed(yamlConfig["Seed"])
-    if options.no_batnorm:
-        model_set = [models.three_layer_model_masked(prune_mask_set[0]), #32b
-                     models.three_layer_model_bv_masked(prune_mask_set[1],12), #12b
-                     models.three_layer_model_bv_masked(prune_mask_set[2],8), #8b
-                     models.three_layer_model_bv_masked(prune_mask_set[3],6), #6b
-                     models.three_layer_model_bv_masked(prune_mask_set[4],4)] #4x
-    else:
+    if options.batnorm:
         model_set = [models.three_layer_model_batnorm_masked(prune_mask_set[0], bn_affine=options.bn_affine, bn_stats=options.bn_stats), #32b
                      models.three_layer_model_bv_batnorm_masked(prune_mask_set[1],12, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #12b
                      models.three_layer_model_bv_batnorm_masked(prune_mask_set[2],8, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #8b
                      models.three_layer_model_bv_batnorm_masked(prune_mask_set[3],6, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #6b
                      models.three_layer_model_bv_batnorm_masked(prune_mask_set[4],4, bn_affine=options.bn_affine, bn_stats=options.bn_stats)] #4x
-
+    else:
+        model_set = [models.three_layer_model_masked(prune_mask_set[0]), #32b
+                     models.three_layer_model_bv_masked(prune_mask_set[1],12), #12b
+                     models.three_layer_model_bv_masked(prune_mask_set[2],8), #8b
+                     models.three_layer_model_bv_masked(prune_mask_set[3],6), #6b
+                     models.three_layer_model_bv_masked(prune_mask_set[4],4)] #4x
 
     #save initalizations in case we're doing Lottery Ticket
     inital_models_sd = []
