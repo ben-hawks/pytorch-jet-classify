@@ -58,7 +58,7 @@ def train(model, optimizer, loss, train_loader, L1_factor=0.0001):
         optimizer.zero_grad()
         outputs = model(local_batch.float())
         criterion_loss = loss(outputs, local_labels.float())
-        if not options.l1reg:
+        if options.l1reg:
             reg_loss = l1_regularizer(model, lambda_l1=L1_factor)
         else:
             reg_loss = 0
@@ -254,8 +254,8 @@ if __name__ == "__main__":
     parser.add_option('-L', '--lottery', action='store_true', dest='lottery', default=False, help='Prune and Train using the Lottery Ticket Hypothesis')
     parser.add_option('-a', '--no_bn_affine', action='store_false', dest='bn_affine', default=True, help='disable BN Affine Parameters')
     parser.add_option('-s', '--no_bn_stats', action='store_false', dest='bn_stats', default=True, help='disable BN running statistics')
-    parser.add_option('-b', '--no_batnorm', action='store_true', dest='batnorm', default=False, help='disable BatchNormalization (BN) Layers ')
-    parser.add_option('-r', '--no_l1reg', action='store_true', dest='l1reg', default=False, help='disable L1 Regularization totally ')
+    parser.add_option('-b', '--no_batnorm', action='store_false', dest='batnorm', default=True, help='disable BatchNormalization (BN) Layers ')
+    parser.add_option('-r', '--no_l1reg', action='store_false', dest='l1reg', default=True, help='disable L1 Regularization totally ')
     (options,args) = parser.parse_args()
     yamlConfig = parse_config(options.config)
     #3938

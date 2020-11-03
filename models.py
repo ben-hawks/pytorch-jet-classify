@@ -222,15 +222,14 @@ class three_layer_model_bv_masked(nn.Module):
 
     def forward(self, x):
         test = self.fc1(x)
-        x = self.act1(self.bn1(test))
+        x = self.act1(test)
         self.fc1.weight.data.mul_(self.m1)
-        x = self.act2(self.bn2(self.fc2(x)))
+        x = self.act2(self.fc2(x))
         self.fc2.weight.data.mul_(self.m2)
-        x = self.act3(self.bn3(self.fc3(x)))
+        x = self.act3(self.fc3(x))
         self.fc3.weight.data.mul_(self.m3)
         softmax_out = self.softmax(self.fc4(x))
         self.fc4.weight.data.mul_(self.m4)
-
         return softmax_out
 
 
