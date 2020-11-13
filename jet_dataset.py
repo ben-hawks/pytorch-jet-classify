@@ -37,8 +37,9 @@ class ParticleJetDataset(Dataset):
                         this_file = pd.DataFrame(self.h5File["jets"][:], columns=columns_arr)
                         features_labels_df = pd.concat([features_labels_df,this_file],axis=0) #concat along axis 0 if doesn't work?
                         self.h5File.close()
-                    except:
+                    except Exception as e:
                         print("Error! Failed to load jet file " + file)
+                        print(e)
         elif os.path.isfile(data_path):
             print("Single data file found!")
             self.h5File = h5py.File(dataPath, 'r', libver='latest', swmr=True)

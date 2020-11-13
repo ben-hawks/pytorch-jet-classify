@@ -16,6 +16,7 @@ import plot_weights
 from pytorchtools import EarlyStopping
 import copy
 from datetime import datetime
+import os
 import os.path as path
 
 def parse_config(config_file) :
@@ -514,10 +515,10 @@ if __name__ == "__main__":
                 base_accuracy_score = np.average(accuracy_score_value_list)
                 base_roc_score = np.average(roc_auc_score_list)
                 filename = path.join(options.outputDir, 'weight_dist_{}b_Base_{}.png'.format(nbits, time))
-                plot_weights.plot_kernels(model,
-                                          text=' (Unpruned FP Model)',
-                                          output=filename)
-                model_filename = path.join(options.outputDir, "{}b_unpruned_{}.pth".format(nbits, time))
+                plot_weights.plot_kernels(model, text=' (Unpruned FP Model)', output=filename)
+                if not path.exists(path.join(options.outputDir,'models','{}b'.format(nbits))):
+                    os.makedirs(path.join(options.outputDir,'models','{}b'.format(nbits)))
+                model_filename = path.join(options.outputDir,'models','{}b'.format(nbits), "{}b_unpruned_{}.pth".format(nbits, time))
                 torch.save(model.state_dict(),model_filename)
                 first_run = False
             elif first_quant:
@@ -528,10 +529,10 @@ if __name__ == "__main__":
                 base_quant_accuracy_score = np.average(accuracy_score_value_list)
                 base_quant_roc_score = np.average(roc_auc_score_list)
                 filename = path.join(options.outputDir, 'weight_dist_{}b_qBase_{}.png'.format(nbits, time))
-                plot_weights.plot_kernels(model,
-                                          text=' (Unpruned Quant Model)',
-                                          output=filename)
-                model_filename = path.join(options.outputDir, "{}b_unpruned_{}.pth".format(nbits, time))
+                plot_weights.plot_kernels(model,text=' (Unpruned Quant Model)', output=filename)
+                if not path.exists(path.join(options.outputDir,'models','{}b'.format(nbits))):
+                    os.makedirs(path.join(options.outputDir,'models','{}b'.format(nbits)))
+                model_filename = path.join(options.outputDir,'models','{}b'.format(nbits), "{}b_unpruned_{}.pth".format(nbits, time))
                 torch.save(model.state_dict(),model_filename)
                 first_quant = False
             else:
@@ -543,7 +544,9 @@ if __name__ == "__main__":
                 prune_results.append(1 / (accuracy_score_value / base_accuracy_score))
                 prune_roc_results.append(1/ (roc_auc_score_value/ base_roc_score))
                 bit_params.append(current_params * nbits)
-                model_filename = path.join(options.outputDir, "{}b_{}pruned_{}.pth".format(nbits, (base_params-current_params), time))
+                if not path.exists(path.join(options.outputDir,'models','{}b'.format(nbits))):
+                    os.makedirs(path.join(options.outputDir,'models','{}b'.format(nbits)))
+                model_filename = path.join(options.outputDir,'models','{}b'.format(nbits),"{}b_{}pruned_{}.pth".format(nbits, (base_params-current_params), time))
                 torch.save(model.state_dict(),model_filename)
 
             # Prune for next iter

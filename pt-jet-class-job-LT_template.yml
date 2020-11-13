@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pt-jet-class-job-baseline
+  name: pt-jet-class-job-LT-$RAND
   labels:
     jobgroup: pt-jet-class-job
 spec:
@@ -13,17 +13,18 @@ spec:
         command:
         - "python"
         args:
-        - /opt/repo/pytorch-jet-classify/train.py
+        - /opt/repo/pytorch-jet-classify/iter_prune.py
         - -i
-        - /ptjetclassvol/train_data/train/
+        - /ptjetclassvol/rand_train_data/$RAND/
         - -t
         - /ptjetclassvol/train_data/test/
         - -c
         - /opt/repo/pytorch-jet-classify/configs/train_config_threelayer.yml
         - -e
-        - "2"
+        - "100"
         - -o
-        - /ptjetclassvol/models/baseline/
+        - /ptjetclassvol/train_output/LT_$RAND/
+        - --lottery
         volumeMounts:
         - mountPath: /ptjetclassvol
           name: pt-jet-class-vol
@@ -31,7 +32,7 @@ spec:
           mountPath: /opt/repo
         resources:
           limits:
-            memory: 16Gi
+            memory: 8Gi
             cpu: "4"
             nvidia.com/gpu: "1"
           requests:
