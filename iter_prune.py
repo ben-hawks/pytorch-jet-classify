@@ -133,10 +133,10 @@ def test(model, test_loader, plot=True, pruned_params=0, base_params=0):
             for i, label in enumerate(test_dataset.labels_list):
                 df[label] = local_labels[:, i]
                 df[label + '_pred'] = predict_test[:, i]
-                fpr[label], tpr[label], threshold = roc_curve(df[label].fillna(0), df[label + '_pred'].fillna(0))
-                auc1[label] = auc(fpr[label].fillna(0), tpr[label].fillna(0))
-                plt.plot(tpr[label].fillna(0), fpr[label].fillna(0),
-                         label='%s tagger, AUC = %.1f%%' % (label.replace('j_', ''), auc1[label] * 100.))
+                fpr[label], tpr[label], threshold = roc_curve(np.nan_to_num(df[label]), np.nan_to_num(df[label + '_pred']))
+                auc1[label] = auc(np.nan_to_num(fpr[label]), np.nan_to_num(tpr[label]))
+                plt.plot(np.nan_to_num(tpr[label]), np.nan_to_num(fpr[label]),
+                         label='%s tagger, AUC = %.1f%%' % (label.replace('j_', ''), np.nan_to_num(auc1[label]) * 100.))
             sig_eff_ax.set_yscale('log')
             sig_eff_ax.set_xlabel("Signal Efficiency")
             sig_eff_ax.set_ylabel("Background Efficiency")
@@ -152,7 +152,7 @@ def test(model, test_loader, plot=True, pruned_params=0, base_params=0):
 
             # Confusion matrix
             filename = 'confMatrix_{}b_{}_pruned_{}.png'.format(nbits,pruned_params,time)
-            conf_mat = confusion_matrix(lbllist.numpy(), predlist.numpy())
+            conf_mat = confusion_matrix(np.nan_to_num(lbllist.numpy()), np.nan_to_num(predlist.numpy()))
             df_cm = pd.DataFrame(conf_mat, index=[i for i in test_dataset.labels_list],
                                  columns=[i for i in test_dataset.labels_list])
             plt.figure(figsize=(10, 7))
