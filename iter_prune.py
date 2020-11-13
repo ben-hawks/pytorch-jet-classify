@@ -133,9 +133,9 @@ def test(model, test_loader, plot=True, pruned_params=0, base_params=0):
             for i, label in enumerate(test_dataset.labels_list):
                 df[label] = local_labels[:, i]
                 df[label + '_pred'] = predict_test[:, i]
-                fpr[label], tpr[label], threshold = roc_curve(df[label], df[label + '_pred'])
-                auc1[label] = auc(fpr[label], tpr[label])
-                plt.plot(tpr[label], fpr[label],
+                fpr[label], tpr[label], threshold = roc_curve(df[label].fillna(0), df[label + '_pred'].fillna(0))
+                auc1[label] = auc(fpr[label].fillna(0), tpr[label].fillna(0))
+                plt.plot(tpr[label].fillna(0), fpr[label].fillna(0),
                          label='%s tagger, AUC = %.1f%%' % (label.replace('j_', ''), auc1[label] * 100.))
             sig_eff_ax.set_yscale('log')
             sig_eff_ax.set_xlabel("Signal Efficiency")
