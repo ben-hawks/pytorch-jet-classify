@@ -10,6 +10,7 @@ spec:
       containers:
       - name: jet-iter-prune
         image:  gitlab-registry.nautilus.optiputer.net/jmduarte/pytorch-jet-classify:latest
+        terminationMessagePolicy: FallbackToLogsOnError
         command:
         - "python"
         args:

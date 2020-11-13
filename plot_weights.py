@@ -30,3 +30,4 @@ def plot_kernels(model, text="", output=None):
         output = os.path.join('weight_dists/', ('weight_dist_' + str(time) + '.png'))
     weight_plt.savefig(output)
     weight_plt.show()
+    weight_plt.close()

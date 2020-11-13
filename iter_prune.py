@@ -148,6 +148,7 @@ def test(model, test_loader, plot=True, pruned_params=0, base_params=0):
                         wrap=True, horizontalalignment='right', fontsize=12)
             sig_eff_plt.savefig(path.join(options.outputDir, filename))
             sig_eff_plt.show()
+            sig_eff_plt.close()
 
             # Confusion matrix
             filename = 'confMatrix_{}b_{}_pruned_{}.png'.format(nbits,pruned_params,time)
@@ -158,6 +159,7 @@ def test(model, test_loader, plot=True, pruned_params=0, base_params=0):
             sn.heatmap(df_cm, annot=True, fmt='g')
             plt.savefig(path.join(options.outputDir, filename))
             plt.show()
+            plt.close()
     return accuracy_score_value_list, roc_auc_score_list
 
 
@@ -217,6 +219,7 @@ def plot_metric_vs_bitparam(model_set,metric_results_set,bit_params_set,base_met
     rel_perf_ax.legend(loc='best')
     rel_perf_plt.savefig(path.join(options.outputDir, filename))
     rel_perf_plt.show()
+    rel_perf_plt.close()
 
 
 def plot_total_loss(model_set, model_totalloss_set, model_estop_set):
@@ -241,6 +244,7 @@ def plot_total_loss(model_set, model_totalloss_set, model_estop_set):
         tloss_plt.tight_layout()
         tloss_plt.savefig(path.join(options.outputDir,filename))
         tloss_plt.show()
+        tloss_plt.close()
 
 
 if __name__ == "__main__":
@@ -502,7 +506,7 @@ if __name__ == "__main__":
             filename = 'loss_plot_e{}_{}_.png'.format(epoch_counter,time)
             loss_plt.savefig(path.join(options.outputDir, filename), bbox_inches='tight')
             loss_plt.show()
-
+            loss_plt.close()
 
             # Prune & Test model
             nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
