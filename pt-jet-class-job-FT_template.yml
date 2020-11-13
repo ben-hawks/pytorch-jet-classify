@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pt-jet-class-job-FT-$RAND
+  name: pt-jet-class-job-ft-$RAND
   labels:
     jobgroup: pt-jet-class-job
 spec:

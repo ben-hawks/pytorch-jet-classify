@@ -1,14 +1,14 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pt-jet-class-job-LT-$RAND
+  name: pt-jet-class-job-lt-$RAND
   labels:
     jobgroup: pt-jet-class-job
 spec:
   template:
     spec:
       containers:
-      - name: jet-iter-prune-LT
+      - name: jet-iter-prune-lottery
         image:  gitlab-registry.nautilus.optiputer.net/jmduarte/pytorch-jet-classify:latest
         command:
         - "python"
