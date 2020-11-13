@@ -44,7 +44,7 @@ spec:
         args:
           - clone
           - --single-branch
-          - https://github.com/jmduarte/pytorch-jet-classify
+          - https://github.com/ben-hawks/pytorch-jet-classify
           - -b
           - master
           - /opt/repo/pytorch-jet-classify
