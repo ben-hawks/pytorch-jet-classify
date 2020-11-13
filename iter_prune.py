@@ -263,6 +263,9 @@ if __name__ == "__main__":
     prune_value_set = [0.10, 0.111, .125, .143, .166, .20, .25, .333, .50, .666, .666,#take ~10% of the "original" value each time, reducing to ~15% original network size
                        0]  # Last 0 is so the final iteration can fine tune before testing
 
+    if not path.exists(options.outputDir): #create given output directory if it doesnt exist
+        os.makedirs(options.outputDir)
+
     prune_mask_set = [
         {  # Float Model
             "fc1": torch.ones(64, 16),
