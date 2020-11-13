@@ -9,11 +9,11 @@ spec:
     command: ["sleep", "infinity"]
     resources:
       limits:
-        memory: 8Gi
-        cpu: "4"
+        memory: 4Gi
+        cpu: "2"
         nvidia.com/gpu: "1"
       requests:
-        memory: 4Gi
+        memory: 2Gi
         cpu: "1"
         nvidia.com/gpu: "1"
     volumeMounts:
