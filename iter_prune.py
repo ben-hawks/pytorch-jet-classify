@@ -87,8 +87,8 @@ def val(model, loss, val_loader, L1_factor=0.01):
             val_loss = criterion_loss + reg_loss
             local_batch, local_labels = local_batch.cpu(), local_labels.cpu()
             outputs = outputs.cpu()
-            val_roc_auc_scores_list.append(roc_auc_score(local_labels.numpy(), outputs.numpy()))
-            val_avg_precision_list.append(average_precision_score(local_labels.numpy(), outputs.numpy()))
+            val_roc_auc_scores_list.append(roc_auc_score(np.nan_to_num(local_labels.numpy()), np.nan_to_num(outputs.numpy())))
+            val_avg_precision_list.append(average_precision_score(np.nan_to_num(local_labels.numpy()), np.nan_to_num(outputs.numpy())))
             val_losses.append(val_loss)
     return val_losses, val_avg_precision_list, val_roc_auc_scores_list
 
@@ -111,8 +111,8 @@ def test(model, test_loader, plot=True, pruned_params=0, base_params=0):
         outputs = outputs.cpu()
         local_labels = local_labels.cpu()
         predict_test = outputs.numpy()
-        accuracy_score_value_list.append(accuracy_score(lbllist.numpy(), predlist.numpy()))
-        roc_auc_score_list.append(roc_auc_score(local_labels.numpy(), outputs.numpy()))
+        accuracy_score_value_list.append(accuracy_score(np.nan_to_num(lbllist.numpy()), np.nan_to_num(predlist.numpy())))
+        roc_auc_score_list.append(roc_auc_score(np.nan_to_num(local_labels.numpy()), np.nan_to_num(outputs.numpy())))
 
         if plot:
             predict_test = outputs.numpy()
