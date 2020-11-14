@@ -351,6 +351,8 @@ if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
     print("Using Device: {}".format(device))
+    if use_cuda:
+        print("cuda:0 device type: {}".format(torch.cuda.get_device_name(0)))
 
     if options.lottery:
         torch.backends.cudnn.enabled = True
