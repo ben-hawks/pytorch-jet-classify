@@ -261,6 +261,7 @@ if __name__ == "__main__":
     parser.add_option('-s', '--no_bn_stats', action='store_false', dest='bn_stats', default=True, help='disable BN running statistics')
     parser.add_option('-b', '--no_batnorm', action='store_false', dest='batnorm', default=True, help='disable BatchNormalization (BN) Layers ')
     parser.add_option('-r', '--no_l1reg', action='store_false', dest='l1reg', default=True, help='disable L1 Regularization totally ')
+    parser.add_option('-m', '--model_set', type='str', dest='model_set', default='32,12,8,6,4', help='comma separated list of which bit widths to run')
     (options,args) = parser.parse_args()
     yamlConfig = parse_config(options.config)
     #3938
@@ -308,6 +309,7 @@ if __name__ == "__main__":
             "fc2": torch.ones(128, 256),
             "fc3": torch.ones(128, 128)}
     ]
+
     # First model should be the "Base" model that all other accuracies are compared to!
 
     if options.lottery:
@@ -316,17 +318,21 @@ if __name__ == "__main__":
         torch.cuda.manual_seed_all(yamlConfig["Seed"]) #seeds all GPUs, just in case there's more than one
         np.random.seed(yamlConfig["Seed"])
     if options.batnorm:
-        model_set = [models.three_layer_model_batnorm_masked(prune_mask_set[0], bn_affine=options.bn_affine, bn_stats=options.bn_stats), #32b
-                     models.three_layer_model_bv_batnorm_masked(prune_mask_set[1],12, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #12b
-                     models.three_layer_model_bv_batnorm_masked(prune_mask_set[2],8, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #8b
-                     models.three_layer_model_bv_batnorm_masked(prune_mask_set[3],6, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #6b
-                     models.three_layer_model_bv_batnorm_masked(prune_mask_set[4],4, bn_affine=options.bn_affine, bn_stats=options.bn_stats)] #4b
+        models = {'32': models.three_layer_model_batnorm_masked(prune_mask_set[0], bn_affine=options.bn_affine, bn_stats=options.bn_stats), #32b
+                  '12': models.three_layer_model_bv_batnorm_masked(prune_mask_set[1],12, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #12b
+                  '8': models.three_layer_model_bv_batnorm_masked(prune_mask_set[2],8, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #8b
+                  '6':  models.three_layer_model_bv_batnorm_masked(prune_mask_set[3],6, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #6b
+                  '4': models.three_layer_model_bv_batnorm_masked(prune_mask_set[4],4, bn_affine=options.bn_affine, bn_stats=options.bn_stats) #4b
+                  }
     else:
-        model_set = [models.three_layer_model_masked(prune_mask_set[0]), #32b
-                     models.three_layer_model_bv_masked(prune_mask_set[1],12), #12b
-                     models.three_layer_model_bv_masked(prune_mask_set[2],8), #8b
-                     models.three_layer_model_bv_masked(prune_mask_set[3],6), #6b
-                     models.three_layer_model_bv_masked(prune_mask_set[4],4)] #4x
+        models = {'32': models.three_layer_model_masked(prune_mask_set[0]), #32b
+                  '12': models.three_layer_model_bv_masked(prune_mask_set[1],12), #12b
+                  '8': models.three_layer_model_bv_masked(prune_mask_set[2],8), #8b
+                  '6': models.three_layer_model_bv_masked(prune_mask_set[3],6), #6b
+                  '4': models.three_layer_model_bv_masked(prune_mask_set[4],4) #4b
+        }
+
+    model_set = [models[m] for m in options.model_set.split(',')]
 
     #save initalizations in case we're doing Lottery Ticket
     inital_models_sd = []
