@@ -320,7 +320,7 @@ if __name__ == "__main__":
                      models.three_layer_model_bv_batnorm_masked(prune_mask_set[1],12, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #12b
                      models.three_layer_model_bv_batnorm_masked(prune_mask_set[2],8, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #8b
                      models.three_layer_model_bv_batnorm_masked(prune_mask_set[3],6, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #6b
-                     models.three_layer_model_bv_batnorm_masked(prune_mask_set[4],4, bn_affine=options.bn_affine, bn_stats=options.bn_stats)] #4x
+                     models.three_layer_model_bv_batnorm_masked(prune_mask_set[4],4, bn_affine=options.bn_affine, bn_stats=options.bn_stats)] #4b
     else:
         model_set = [models.three_layer_model_masked(prune_mask_set[0]), #32b
                      models.three_layer_model_bv_masked(prune_mask_set[1],12), #12b
@@ -406,6 +406,8 @@ if __name__ == "__main__":
         model_estop = []
         epoch_counter = 0
         pruned_params = 0
+        nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
+        print("~!~!~!~!~!~!~!! Starting Train/Prune Cycle for {}b model! !!~!~!~!~!~!~!~".format(nbits))
         for prune_value in prune_value_set:
             # Epoch specific plot values
             avg_train_losses = []
@@ -425,7 +427,8 @@ if __name__ == "__main__":
             estop = False
 
             if options.lottery:  # If using lottery ticket method, reset all weights to first initalized vals
-                print("Resetting Model to Inital State dict with masks applied. Verifying via param count.")
+                print("~~~~~!~!~!~!~!~!~Resetting Model!~!~!~!~!~!~~~~~\n\n")
+                print("Resetting Model to Inital State dict with masks applied. Verifying via param count.\n\n")
                 model.load_state_dict(init_sd)
                 model.update_masks(prune_mask)
                 model.force_mask_apply()
