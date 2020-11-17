@@ -25,7 +25,7 @@ spec:
         - "100"
         - -o
         - /ptjetclassvol/train_output/LT_$RAND/
-        - --lottery
+        - -L
         volumeMounts:
         - mountPath: /ptjetclassvol
           name: pt-jet-class-vol
