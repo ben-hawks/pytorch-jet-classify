@@ -350,6 +350,7 @@ parser.add_option('-o', '--output', action='store', type='string', dest='outputD
                   help='output directory')
 parser.add_option('-t', '--test', action='store', type='string', dest='test', default='train_data/test',
                   help='Location of test data set')
+parser.add_option('-c','--config', action='store',type='string',dest='config', default='/opt/repo/pytorch-jet-classify/configs/train_config_threelayer.yml', help='tree name')
 
 (options,args) = parser.parse_args()
 
@@ -357,7 +358,7 @@ if not os.path.exists(options.outputDir):  # create given output directory if it
     os.makedirs(options.outputDir)
 
 # Load the model config file
-yamlConfig = parse_config('configs/train_config_threelayer.yml')
+yamlConfig = parse_config(options.config)
 
 #Mask sets, required to load model class but not 'used' here really
 prune_mask_set = {  # Float Model
