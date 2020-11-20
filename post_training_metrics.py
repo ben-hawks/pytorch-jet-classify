@@ -353,6 +353,9 @@ parser.add_option('-t', '--test', action='store', type='string', dest='test', de
 
 (options,args) = parser.parse_args()
 
+if not os.path.exists(options.outputDir):  # create given output directory if it doesnt exist
+    os.makedirs(options.outputDir)
+
 # Load the model config file
 yamlConfig = parse_config('configs/train_config_threelayer.yml')
 
