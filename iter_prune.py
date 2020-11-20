@@ -14,7 +14,7 @@ import math
 import seaborn as sn
 import plot_weights
 from pytorchtools import EarlyStopping
-import copy
+import json
 from datetime import datetime
 import os
 import os.path as path
@@ -348,6 +348,8 @@ if __name__ == "__main__":
     model_totalloss_set = []
     model_estop_set = []
 
+    model_totalloss_json_dict = {}
+
     base_quant_accuracy_score, base_accuracy_score = None, None
 
     first_run = True
@@ -587,6 +589,10 @@ if __name__ == "__main__":
         prune_roc_set.append(prune_roc_results)
         model_totalloss_set.append(model_loss)
         model_estop_set.append(model_estop)
+        model_totalloss_json_dict.update({nbits:[model_loss,model_estop]})
+
+    with open(os.path.join(options.outputDir, 'model_losses.json'), 'w') as fp:
+        json.dump(model_totalloss_json_dict, fp)
 
     if base_quant_params == None:
         base_acc_set = [[base_params, base_accuracy_score]]
