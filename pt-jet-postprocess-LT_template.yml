@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pt-jet-postprocess-job-$PRUNE-$RAND
+  name: pt-jet-postprocess-job-LT-$RAND
   labels:
     jobgroup: pt-jet-postprocess-job
 spec:
@@ -18,9 +18,9 @@ spec:
         - -t
         - /ptjetclassvol/train_data/test/
         - -i
-        - /ptjetclassvol/train_output/$PRUNE_$RAND/models/
+        - /ptjetclassvol/train_output/LT_$RAND_Run2/models/
         - -o
-        - /ptjetclassvol/train_output/$PRUNE_$RAND/aiq_plots/
+        - /ptjetclassvol/train_output/LT_$RAND_Run2/aiq_plots/
         volumeMounts:
         - mountPath: /ptjetclassvol
           name: pt-jet-class-vol
@@ -28,13 +28,11 @@ spec:
           mountPath: /opt/repo
         resources:
           limits:
-            memory: 8Gi
-            cpu: "4"
-            nvidia.com/gpu: "1"
-          requests:
             memory: 4Gi
+            cpu: "4"
+          requests:
+            memory: 2Gi
             cpu: "1"
-            nvidia.com/gpu: "1"
       initContainers:
       - name: init-clone-repo
         image: alpine/git

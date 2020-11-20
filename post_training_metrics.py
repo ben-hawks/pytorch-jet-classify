@@ -438,7 +438,7 @@ dump_dict={ '32b':float_AiQ,
             '6b':quant_6b_AiQ,
             '4b':quant_4b_AiQ
 }
-with open('BN_A_S_results.json', 'w') as fp:
+with open(os.path.join(options.outputDir,'aiQ_results.json'), 'w') as fp:
     json.dump(dump_dict, fp)
 
 
@@ -474,7 +474,7 @@ aiq_ax.plot([key for key in quant_6b_AiQ],[z['auc_roc'] for z in quant_6b_AiQ.va
 aiq_ax.plot([key for key in quant_4b_AiQ],[z['auc_roc'] for z in quant_4b_AiQ.values()], label='4b Quantized')
 aiq_ax.plot([key for key in quant_batnorm_AiQ],[z['auc_roc'] for z in quant_batnorm_AiQ.values()], label='8b Quantized')
 aiq_ax.legend(loc='best')
-aiq_plot.savefig('auc_roc_BOPS.png')
+aiq_plot.savefig(os.path.join(options.outputDir,'auc_roc_BOPS.png'))
 aiq_plot.show()
 
 
@@ -492,7 +492,7 @@ aiq_ax.plot([key for key in quant_6b_AiQ],[z['accuracy'] for z in quant_6b_AiQ.v
 aiq_ax.plot([key for key in quant_4b_AiQ],[z['accuracy'] for z in quant_4b_AiQ.values()], label='4b Quantized')
 aiq_ax.plot([key for key in quant_batnorm_AiQ],[z['accuracy'] for z in quant_batnorm_AiQ.values()], label='8b Quantized')
 aiq_ax.legend(loc='best')
-aiq_plot.savefig('acc_BOPS.png')
+aiq_plot.savefig(os.path.join(options.outputDir,'acc_BOPS.png'))
 aiq_plot.show()
 
 
@@ -511,7 +511,7 @@ eff_ax.plot([key for key in quant_6b_AiQ],[z['net_efficiency'] for z in quant_6b
 eff_ax.plot([key for key in quant_4b_AiQ],[z['net_efficiency'] for z in quant_4b_AiQ.values()], label='4b Quantized')
 eff_ax.plot([key for key in quant_batnorm_AiQ],[z['net_efficiency'] for z in quant_batnorm_AiQ.values()], label='8b Quantized')
 eff_ax.legend(loc='best')
-eff_plot.savefig('t_eff_BOPS.png')
+eff_plot.savefig(os.path.join(options.outputDir,'t_eff_BOPS.png'))
 eff_plot.show()
 
 
@@ -532,7 +532,7 @@ for label in test_dataset.labels_list:
     aiq_ax.plot([key for key in quant_4b_AiQ], [z['sel_bkg_reject'][label] for z in quant_4b_AiQ.values()], label='4b Quantized')
     aiq_ax.plot([key for key in quant_batnorm_AiQ],[z['sel_bkg_reject'][label] for z in quant_batnorm_AiQ.values()], label='8b Quantized')
     aiq_ax.legend(loc='best')
-    aiq_plot.savefig('bgd_eff_{}_BOPS.png'.format(label))
+    aiq_plot.savefig(os.path.join(options.outputDir,'bgd_eff_{}_BOPS.png'.format(label)))
     aiq_plot.show()
 
 
@@ -566,5 +566,5 @@ for layer,color in zip(layer_list,colors):
                 [z['layer_metrics'][layer]['efficiency']  for z in quant_batnorm_AiQ.values()]
                 , label='8b Quant (BN) - ' + layer + ' Eff.', linestyle=(0, (3, 1, 1, 1, 1, 1)), color=color)
 eff_ax.legend(loc='best')
-eff_plot.savefig('layer_eff_BOPS.png')
+eff_plot.savefig(os.path.join(options.outputDir,'layer_eff_BOPS.png'))
 eff_plot.show()
