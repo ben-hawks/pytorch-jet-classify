@@ -250,7 +250,7 @@ def calc_AiQ(model,model_file):
         predlist = torch.cat([predlist, preds.view(-1).cpu()])
         lbllist = torch.cat([lbllist, torch.max(local_labels, 1)[1].view(-1).cpu()])
         accuracy_list.append(np.average((accuracy_score(lbllist.numpy(), predlist.numpy()))))
-        roc_list.append(roc_auc_score(local_labels,outputs))
+        roc_list.append(roc_auc_score(np.nan_to_num(local_labels.numpy()), np.nan_to_num(outputs.numpy())))
 
         #Calculate background eff @ signal eff of 50%
         df = pd.DataFrame()
@@ -263,9 +263,9 @@ def calc_AiQ(model,model_file):
         for i, label in enumerate(test_dataset.labels_list):
             df[label] = local_labels[:, i]
             df[label + '_pred'] = predict_test[:, i]
-            fpr[label], tpr[label], threshold = roc_curve(df[label], df[label + '_pred'])
-            bkg_reject[label] = np.interp(0.5, tpr[label], fpr[label]) # Get background rejection factor @ Sig Eff = 50%
-            auc1[label] = auc(fpr[label], tpr[label])
+            fpr[label], tpr[label], threshold = roc_curve(np.nan_to_num(df[label]), np.nan_to_num(df[label + '_pred']))
+            bkg_reject[label] = np.interp(0.5, np.nan_to_num(tpr[label]), (np.nan_to_num(fpr[label]))) # Get background rejection factor @ Sig Eff = 50%
+            auc1[label] = auc(np.nan_to_num(fpr[label]), np.nan_to_num(tpr[label]))
         sel_bkg_reject_list.append(bkg_reject)
 
         #Calculate microstates for this run
