@@ -365,7 +365,7 @@ prune_mask_set = {  # Float Model
         "fc1": torch.ones(64, 16),
         "fc2": torch.ones(32, 64),
         "fc3": torch.ones(32, 32),
-    	"fc4": torch.ones(32,5)}
+    	"fc4": torch.ones(5, 32)}
 prune_mask_set2 = [
     {  # 1/4 Quant Model
         "fc1": torch.ones(16, 16),
