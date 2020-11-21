@@ -83,7 +83,7 @@ def plot_metric_vs_bitparam(model_set,metric_results_set,bit_params_set,base_met
 
 def ae_MSE(model, model_file, test_loaders):
     errors_list = []
-    model.load_state_dict(torch.load(os.path.join(model_file)))
+    model.load_state_dict(torch.load(os.path.join(model_file), map_location=device))
     for test_loader in test_loaders: #Eventually evaluate the ROC if we're using the Dev set (vs Eval set), just returm MSE for now
         with torch.no_grad():  # Evaulate pruned model performance
             for i, data in enumerate(test_loader):
@@ -114,7 +114,7 @@ def gen_model_dict(model, dir):
         #print(dir_list)
         for file in dir_list:
             try:
-                model.load_state_dict(torch.load(os.path.join(dir, file)))
+                model.load_state_dict(torch.load(os.path.join(dir, file), map_location=device))
                 count, total_cnt, _, _ = countNonZeroWeights(model)
                 bops = calc_BOPS(model)
                 if first: #Assume first alphabetical is the first model, for the sake of checking all pth are same model
@@ -156,7 +156,7 @@ def gen_bo_model_dict(dir):
                 "fc2": torch.ones(dims[1], dims[0]),
                 "fc3": torch.ones(dims[2], dims[1])}
                 model = models.three_layer_model_bv_tunable(prune_masks,size) #Shouldnt have to worry about correct precision for simple param count (for now)
-                model.load_state_dict(torch.load(os.path.join(dir, file)))
+                model.load_state_dict(torch.load(os.path.join(dir, file), map_location=device))
                 count, total_param, _, _ = countNonZeroWeights(model)
                 bops = calc_BOPS(model)
                 model_dict.update({int(bops): file})
@@ -207,7 +207,7 @@ def calc_BOPS(model, input_data_precision=32):
 
 def calc_AiQ(model,model_file):
     """ Calculate efficiency of network using TensorEfficiency """
-    model.load_state_dict(torch.load(os.path.join(model_file)))
+    model.load_state_dict(torch.load(os.path.join(model_file), map_location=device))
     # Time the execution
     start_time = time.time()
 
