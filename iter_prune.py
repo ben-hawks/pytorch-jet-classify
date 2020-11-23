@@ -265,7 +265,7 @@ if __name__ == "__main__":
     (options,args) = parser.parse_args()
     yamlConfig = parse_config(options.config)
     #3938
-    prune_value_set = [0.10, 0.111, .125, .143, .166, .20, .25, .333, .50, .666, .666,#take ~10% of the "original" value each time, reducing to ~15% original network size
+    prune_value_set = [0.10, 0.111,# .125, .143, .166, .20, .25, .333, .50, .666, .666,#take ~10% of the "original" value each time, reducing to ~15% original network size
                        0]  # Last 0 is so the final iteration can fine tune before testing
 
     if not path.exists(options.outputDir): #create given output directory if it doesnt exist
@@ -464,8 +464,8 @@ if __name__ == "__main__":
                 val_roc_auc_score = np.average(val_roc_auc_scores_list)
                 val_avg_precision = np.average(val_avg_precision_list)
 
-                avg_train_losses.append(train_loss)
-                avg_valid_losses.append(valid_loss)
+                avg_train_losses.append(train_loss.tolist())
+                avg_valid_losses.append(valid_loss.tolist())
                 avg_precision_scores.append(val_avg_precision)
 
                 # Print epoch statistics
@@ -499,7 +499,7 @@ if __name__ == "__main__":
             if estop:
                 minposs = avg_valid_losses.index(min(avg_valid_losses))
             else:
-                minposs = options.epochs-1
+                minposs = options.epochs
             model_loss[0].extend(avg_train_losses[:minposs])
             model_loss[1].extend(avg_valid_losses[:minposs])
 
@@ -511,7 +511,7 @@ if __name__ == "__main__":
 
             # Plot losses for this iter
 
-            loss_ax.axvline(minposs+1, linestyle='--', color='r', label='Early Stopping Checkpoint')
+            loss_ax.axvline(minposs, linestyle='--', color='r', label='Early Stopping Checkpoint')
             loss_ax.set_xlabel('epochs')
             loss_ax.set_ylabel('loss')
             loss_ax.grid(True)

@@ -198,8 +198,9 @@ def calc_BOPS(model, input_data_precision=32):
             alive = l_alive[name + '.weight'] + l_alive[name + '.bias']
             p = 1 - ((total - alive) / total)  # fraction of layer remaining
             #assuming b_a is the output bitwidth of the last layer
-            module_BOPS = m*n*p*(b_a*b_w + b_a + b_w + math.log2(n))
-            print("{} BOPS: {} = {}*{}*{}({}*{} + {} + {} + {})".format(name,module_BOPS,m,n,p,b_a,b_w,b_a,b_w,math.log2(n)))
+            #module_BOPS = m*n*p*(b_a*b_w + b_a + b_w + math.log2(n))
+            module_BOPS = m * n * (p * b_a * p * b_w + b_a + b_w + math.log2(n))
+            print("{} BOPS: {} = {}*{}({}*{}*{}*{} + {} + {} + {})".format(name,module_BOPS,m,n,p,b_a,p,b_w,b_a,b_w,math.log2(n)))
             last_bit_width = b_w
             total_BOPS += module_BOPS
     print("Total BOPS: {}".format(total_BOPS))
