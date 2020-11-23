@@ -552,7 +552,7 @@ eff_ax.grid(True)
 eff_ax.set_xlabel('Binary Operations (BOPS)')
 eff_ax.set_xscale("log")
 eff_ax.set_ylabel('Efficiency')
-layer_list=['fc1','fc2','fc3', 'fc4']
+layer_list=['bn1','bn2',' bn3', 'fc4']
 colors=['red','blue','green', 'orange']
 for layer,color in zip(layer_list,colors):
     eff_ax.plot([(model_max_params-key)*32 for key in float_AiQ],
