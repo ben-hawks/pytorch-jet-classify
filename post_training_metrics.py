@@ -220,9 +220,11 @@ def calc_AiQ(model,model_file):
     sel_bkg_reject_list = []
     # Initialize arrays for storing microstates
     microstates = {name: np.ndarray([]) for name, module in model.named_modules() if
-                   isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)}
+                   ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
+                   or (isinstance(module, torch.nn.BatchNorm1d))}
     microstates_count = {name: 0 for name, module in model.named_modules() if
-                         isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)}
+                         ((isinstance(module, torch.nn.Linear) or isinstance(module,qnn.QuantLinear)) and name == 'fc4') \
+                         or (isinstance(module, torch.nn.BatchNorm1d))}
 
     activation_outputs = SaveOutput()  # Our forward hook class, stores the outputs of each layer it's registered to
 
