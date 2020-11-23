@@ -229,7 +229,8 @@ def calc_AiQ(model,model_file):
     # register a forward hook to get and store the activation at each Linear layer while running
     layer_list = []
     for name, module in model.named_modules():
-        if (isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)):  # We only care about linear layers except the last
+        if ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
+          or (isinstance(module, torch.nn.BatchNorm1d)):  # Record @ BN output except last layer (since last has no BN)
             module.register_forward_hook(activation_outputs)
             layer_list.append(name)  # Probably a better way to do this, but it works,
 
