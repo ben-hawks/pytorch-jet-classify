@@ -265,7 +265,7 @@ if __name__ == "__main__":
     (options,args) = parser.parse_args()
     yamlConfig = parse_config(options.config)
     #3938
-    prune_value_set = [0.10, 0.111,# .125, .143, .166, .20, .25, .333, .50, .666, .666,#take ~10% of the "original" value each time, reducing to ~15% original network size
+    prune_value_set = [0.10, 0.111, .125, .143, .166, .20, .25, .333, .50, .666, .666,#take ~10% of the "original" value each time, reducing to ~15% original network size
                        0]  # Last 0 is so the final iteration can fine tune before testing
 
     if not path.exists(options.outputDir): #create given output directory if it doesnt exist
