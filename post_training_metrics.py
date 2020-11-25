@@ -407,11 +407,26 @@ test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=25000,
 
 dir = "model_files/"
 dir = options.model_files
-float_model_set, model_max_params = gen_model_dict(models.three_layer_model_batnorm_masked(prune_mask_set), os.path.join(dir, '32b'))
-quant_model_set_4b, quant_4b_max_params = gen_model_dict(models.three_layer_model_bv_batnorm_masked(prune_mask_set,4), os.path.join(dir, '4b'))
-quant_model_set_6b, quant_6b_max_params = gen_model_dict(models.three_layer_model_bv_batnorm_masked(prune_mask_set,6), os.path.join(dir, '6b'))
-quant_model_set_12b, quant_12b_max_params = gen_model_dict(models.three_layer_model_bv_batnorm_masked(prune_mask_set,12), os.path.join(dir, '12b'))
-quant_batnorm_model_set, batnorm_max_params = gen_model_dict(models.three_layer_model_bv_batnorm_masked(prune_mask_set, 8), os.path.join(dir, '8b'))
+try:
+    float_model_set, model_max_params = gen_model_dict(models.three_layer_model_batnorm_masked(prune_mask_set), os.path.join(dir, '32b'))
+except:
+    float_model_set, model_max_params = {},0
+try:
+    quant_model_set_4b, quant_4b_max_params = gen_model_dict(models.three_layer_model_bv_batnorm_masked(prune_mask_set,4), os.path.join(dir, '4b'))
+except:
+    quant_model_set_4b, quant_4b_max_params = {},0
+try:
+    quant_model_set_6b, quant_6b_max_params = gen_model_dict(models.three_layer_model_bv_batnorm_masked(prune_mask_set,6), os.path.join(dir, '6b'))
+except:
+    quant_model_set_6b, quant_6b_max_params = {},0
+try:
+    quant_model_set_12b, quant_12b_max_params = gen_model_dict(models.three_layer_model_bv_batnorm_masked(prune_mask_set,12), os.path.join(dir, '12b'))
+except:
+    quant_model_set_12b, quant_12b_max_params = {},0
+try:
+    quant_batnorm_model_set, batnorm_max_params = gen_model_dict(models.three_layer_model_bv_batnorm_masked(prune_mask_set, 8), os.path.join(dir, '8b'))
+except:
+    quant_batnorm_model_set, batnorm_max_params = {},0
 
 #Run through each model set, calculating AiQ for each model in the set
 float_AiQ = {}
