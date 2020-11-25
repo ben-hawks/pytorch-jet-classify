@@ -28,6 +28,9 @@ if __name__ == "__main__":
         (options, args) = parser.parse_args()
         yamlConfig = parse_config(options.config)
 
+        if not os.path.exists(options.outputDir):  # create given output directory if it doesnt exist
+            os.makedirs(options.outputDir)
+
         data_path = options.inputFile
 
         # List of features to use
@@ -61,9 +64,8 @@ if __name__ == "__main__":
                         for i, row in features_labels_df[:random_labels].iterrows(): # iterate over the first N% of data
                             valid_labels = labels_list[:]
                             current_val = labels_df.columns[(labels_df.iloc[i] == 1.0)][0] #find the current value
-                            valid_labels.remove(current_val) #remove previous value to make sure new is different
                             features_labels_df.at[i, current_val] = 0.0 #set previous "label" column to 0
-                            new_label_loc = random.choice(valid_labels)  # Randomize our label, making sure to set it to something different
+                            new_label_loc = random.choice(valid_labels)  # Randomize our label to 1/5 possible labels
                             features_labels_df.at[i, new_label_loc] = 1.0 #Set our new random label to true in the df
                             #print("\t -> Modified Row: {}".format(features_labels_df.loc[i, labels_list]))
                         filename = "{}rand_".format(options.random)+file

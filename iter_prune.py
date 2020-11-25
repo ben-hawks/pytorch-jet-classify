@@ -94,6 +94,7 @@ def val(model, loss, val_loader, L1_factor=0.01):
 
 
 def test(model, test_loader, plot=True, pruned_params=0, base_params=0):
+    #device = torch.device('cpu') #required if doing a untrained init check
     predlist = torch.zeros(0, dtype=torch.long, device='cpu')
     lbllist = torch.zeros(0, dtype=torch.long, device='cpu')
     accuracy_score_value_list = []

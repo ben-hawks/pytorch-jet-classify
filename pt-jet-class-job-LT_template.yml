@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pt-jet-class-job-lt-$RAND
+  name: pt-jet-class-job-lt-$PRECb-$RAND
   labels:
     jobgroup: pt-jet-class-job
 spec:
@@ -22,10 +22,12 @@ spec:
         - -c
         - /opt/repo/pytorch-jet-classify/configs/train_config_threelayer.yml
         - -e
-        - "100"
+        - "250"
         - -o
         - /ptjetclassvol/train_output/LT_$RAND/
         - -L
+        - -m
+        - $PREC
         volumeMounts:
         - mountPath: /ptjetclassvol
           name: pt-jet-class-vol

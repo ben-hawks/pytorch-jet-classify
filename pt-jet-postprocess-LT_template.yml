@@ -18,9 +18,9 @@ spec:
         - -t
         - /ptjetclassvol/train_data/test/
         - -i
-        - /ptjetclassvol/train_output/LT_$RAND_Run2/models/
+        - /ptjetclassvol/train_output/LT_$RAND/models/
         - -o
-        - /ptjetclassvol/train_output/LT_$RAND_Run2/aiq_plots_reveq2/
+        - /ptjetclassvol/train_output/LT_$RAND/aiq_plots/
         volumeMounts:
         - mountPath: /ptjetclassvol
           name: pt-jet-class-vol
