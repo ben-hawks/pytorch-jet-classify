@@ -355,6 +355,7 @@ parser.add_option('-o', '--output', action='store', type='string', dest='outputD
 parser.add_option('-t', '--test', action='store', type='string', dest='test', default='train_data/test',
                   help='Location of test data set')
 parser.add_option('-c','--config', action='store',type='string',dest='config', default='/opt/repo/pytorch-jet-classify/configs/train_config_threelayer.yml', help='tree name')
+parser.add_option('-n','--name', action='store',type='string',dest='name', default='aIQ_results.json', help='JSON Output Filename')
 
 (options,args) = parser.parse_args()
 
@@ -461,7 +462,7 @@ dump_dict={ '32b':float_AiQ,
             '6b':quant_6b_AiQ,
             '4b':quant_4b_AiQ
 }
-with open(os.path.join(options.outputDir,'aiQ_results.json'), 'w') as fp:
+with open(os.path.join(options.outputDir, options.name), 'w') as fp:
     json.dump(dump_dict, fp)
 
 

@@ -21,6 +21,8 @@ spec:
         - /ptjetclassvol/train_output/FT_$RAND/models/
         - -o
         - /ptjetclassvol/train_output/FT_$RAND/aiq_plots/
+        - -n
+        - "FT_$RAND"
         volumeMounts:
         - mountPath: /ptjetclassvol
           name: pt-jet-class-vol
