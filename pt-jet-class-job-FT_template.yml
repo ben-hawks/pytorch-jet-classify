@@ -26,7 +26,7 @@ spec:
         - -o
         - /ptjetclassvol/train_output/FT_$RAND/
         - -m
-        - $PREC
+        - "$PREC"
         volumeMounts:
         - mountPath: /ptjetclassvol
           name: pt-jet-class-vol
