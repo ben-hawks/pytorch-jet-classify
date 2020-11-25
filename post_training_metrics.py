@@ -462,7 +462,7 @@ dump_dict={ '32b':float_AiQ,
             '6b':quant_6b_AiQ,
             '4b':quant_4b_AiQ
 }
-with open(os.path.join(options.outputDir, options.name), 'w') as fp:
+with open(os.path.join(options.outputDir, options.name+".json"), 'w') as fp:
     json.dump(dump_dict, fp)
 
 
