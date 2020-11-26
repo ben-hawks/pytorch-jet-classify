@@ -1,14 +1,14 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pt-jet-class-job-lt-$PRECb-$RAND
+  name: pt-jet-class-job-ft-nobn-$PRECb
   labels:
     jobgroup: pt-jet-class-job
 spec:
   template:
     spec:
       containers:
-      - name: jet-iter-prune-lottery
+      - name: jet-iter-prune
         image:  gitlab-registry.nautilus.optiputer.net/jmduarte/pytorch-jet-classify:latest
         terminationMessagePolicy: FallbackToLogsOnError
         command:
@@ -16,7 +16,7 @@ spec:
         args:
         - /opt/repo/pytorch-jet-classify/iter_prune.py
         - -i
-        - /ptjetclassvol/rand_train_data/$RAND/
+        - /ptjetclassvol/rand_train_data/0/
         - -t
         - /ptjetclassvol/train_data/test/
         - -c
@@ -24,10 +24,11 @@ spec:
         - -e
         - "250"
         - -o
-        - /ptjetclassvol/train_output/LT_$RAND/
-        - -L
+        - /ptjetclassvol/train_output/FT_0_NoBN/
         - -m
         - "$PREC"
+        - -n
+        - -b
         volumeMounts:
         - mountPath: /ptjetclassvol
           name: pt-jet-class-vol

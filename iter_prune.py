@@ -12,14 +12,14 @@ import torch.nn.utils.prune as prune
 import yaml
 import math
 import seaborn as sn
-import plot_weights
-from pytorchtools import EarlyStopping
+from tools import plot_weights, TensorEfficiency
+from tools.pytorchtools import EarlyStopping
 import json
 from datetime import datetime
 import os
 import os.path as path
-import TensorEfficiency
 import brevitas.nn as qnn
+import time as time_lib
 
 def parse_config(config_file) :
     print("Loading configuration from", config_file)
@@ -57,36 +57,45 @@ def l1_regularizer(model, lambda_l1=0.01):
             lossl1 += lambda_l1 * model_param_value.abs().sum()
     return lossl1
 
-def calc_AiQ(aiq_model,model_file):
+def calc_AiQ(aiq_model):
     """ Calculate efficiency of network using TensorEfficiency """
-    aiq_model.load_state_dict(torch.load(os.path.join(model_file), map_location=device))
     # Time the execution
-    start_time = time.time()
-
+    start_time = time_lib.time()
+    aiq_model.cpu()
+    aiq_model.mask_to_device('cpu')
+    aiq_model.eval()
+    hooklist = []
     # Set up the data
     ensemble = {}
-    accuracy = 0
-    accuracy_list = []
-    roc_list = []
-    sel_bkg_reject_list = []
+
     # Initialize arrays for storing microstates
-    microstates = {name: np.ndarray([]) for name, module in aiq_model.named_modules() if
-                   ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
-                   or (isinstance(module, torch.nn.BatchNorm1d))}
-    microstates_count = {name: 0 for name, module in aiq_model.named_modules() if
-                         ((isinstance(module, torch.nn.Linear) or isinstance(module,qnn.QuantLinear)) and name == 'fc4') \
-                         or (isinstance(module, torch.nn.BatchNorm1d))}
+    if options.batnorm:
+        microstates = {name: np.ndarray([]) for name, module in aiq_model.named_modules() if
+                       ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
+                       or (isinstance(module, torch.nn.BatchNorm1d))}
+        microstates_count = {name: 0 for name, module in aiq_model.named_modules() if
+                             ((isinstance(module, torch.nn.Linear) or isinstance(module,qnn.QuantLinear)) and name == 'fc4') \
+                             or (isinstance(module, torch.nn.BatchNorm1d))}
+    else:
+        microstates = {name: np.ndarray([]) for name, module in model.named_modules() if
+                       isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)}
+        microstates_count = {name: 0 for name, module in model.named_modules() if
+                             isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)}
 
     activation_outputs = SaveOutput()  # Our forward hook class, stores the outputs of each layer it's registered to
 
     # register a forward hook to get and store the activation at each Linear layer while running
     layer_list = []
     for name, module in aiq_model.named_modules():
-        if ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
-          or (isinstance(module, torch.nn.BatchNorm1d)):  # Record @ BN output except last layer (since last has no BN)
-            module.register_forward_hook(activation_outputs)
-            layer_list.append(name)  # Probably a better way to do this, but it works,
-
+        if options.batnorm:
+            if ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
+              or (isinstance(module, torch.nn.BatchNorm1d)):  # Record @ BN output except last layer (since last has no BN)
+                hooklist.append(module.register_forward_hook(activation_outputs))
+                layer_list.append(name)  # Probably a better way to do this, but it works,
+        else:
+            if (isinstance(module, torch.nn.Linear) or isinstance(module,qnn.QuantLinear)):  # We only care about linear layers except the last
+                hooklist.append(module.register_forward_hook(activation_outputs))
+                layer_list.append(name)  # Probably a better way to do this, but it works,
     # Process data using torch dataloader, in this case we
     for i, data in enumerate(test_loader, 0):
         activation_outputs.clear()
@@ -94,107 +103,61 @@ def calc_AiQ(aiq_model,model_file):
 
         # Run through our test batch and get inference results
         with torch.no_grad():
-            local_batch, local_labels = local_batch.to(device), local_labels.to(device)
+            local_batch, local_labels = local_batch.to('cpu'), local_labels.to('cpu')
             outputs = aiq_model(local_batch.float())
 
-        # Calculate accuracy (top-1 averaged over each of n=5 classes)
-        outputs.cpu()
-        predlist = torch.zeros(0, dtype=torch.long, device='cpu')
-        lbllist = torch.zeros(0, dtype=torch.long, device='cpu')
-        _, preds = torch.max(outputs, 1)
-        predlist = torch.cat([predlist, preds.view(-1).cpu()])
-        lbllist = torch.cat([lbllist, torch.max(local_labels, 1)[1].view(-1).cpu()])
-        accuracy_list.append(np.average((accuracy_score(lbllist.numpy(), predlist.numpy()))))
-        roc_list.append(roc_auc_score(np.nan_to_num(local_labels.numpy()), np.nan_to_num(outputs.numpy())))
+            # Calculate microstates for this run
+            for name, x in zip(layer_list, activation_outputs.outputs):
+                # print("---- AIQ Calc ----")
+                # print("Act list: " + name + str(x))
+                x = x.numpy()
+                # Initialize the layer in the ensemble if it doesn't exist
+                if name not in ensemble.keys():
+                    ensemble[name] = {}
 
-        #Calculate background eff @ signal eff of 50%
-        df = pd.DataFrame()
-        fpr = {}
-        tpr = {}
-        auc1 = {}
-        bkg_reject = {}
-        predict_test = outputs.numpy()
-        # X = TPR, Y = FPR
-        for i, label in enumerate(test_dataset.labels_list):
-            df[label] = local_labels[:, i]
-            df[label + '_pred'] = predict_test[:, i]
-            fpr[label], tpr[label], threshold = roc_curve(np.nan_to_num(df[label]), np.nan_to_num(df[label + '_pred']))
-            bkg_reject[label] = np.interp(0.5, np.nan_to_num(tpr[label]), (np.nan_to_num(fpr[label]))) # Get background rejection factor @ Sig Eff = 50%
-            auc1[label] = auc(np.nan_to_num(fpr[label]), np.nan_to_num(tpr[label]))
-        sel_bkg_reject_list.append(bkg_reject)
+                # Initialize an array for holding layer states if it has not already been initialized
+                sort_count_freq = 1  # How often (iterations) we sort/count states
+                if microstates[name].size == 1:
+                    microstates[name] = np.ndarray((sort_count_freq * np.prod(x.shape[0:-1]), x.shape[-1]), dtype=bool,
+                                                   order='F')
 
-        #Calculate microstates for this run
-        for name, x in zip(layer_list, activation_outputs.outputs):
-            # print("---- AIQ Calc ----")
-            # print("Act list: " + name + str(x))
-            x = x.numpy()
-            # Initialize the layer in the ensemble if it doesn't exist
-            if name not in ensemble.keys():
-                ensemble[name] = {}
+                # Store the layer states
+                new_count = microstates_count[name] + np.prod(x.shape[0:-1])
+                microstates[name][
+                microstates_count[name]:microstates_count[name] + np.prod(x.shape[0:-1]), :] = np.reshape(x > 0,(-1, x.shape[-1]), order='F')
+                # Only sort/count states every 5 iterations
+                if new_count < microstates[name].shape[0]:
+                    microstates_count[name] = new_count
+                    continue
+                else:
+                    microstates_count[name] = 0
 
-            # Initialize an array for holding layer states if it has not already been initialized
-            sort_count_freq = 5  # How often (iterations) we sort/count states
-            if microstates[name].size == 1:
-                microstates[name] = np.ndarray((sort_count_freq * np.prod(x.shape[0:-1]), x.shape[-1]), dtype=bool,
-                                               order='F')
+                # TensorEfficiency.sort_microstates aggregates microstates by sorting
+                sorted_states, index = TensorEfficiency.sort_microstates(microstates[name], True)
 
-            # Store the layer states
-            new_count = microstates_count[name] + np.prod(x.shape[0:-1])
-            microstates[name][
-            microstates_count[name]:microstates_count[name] + np.prod(x.shape[0:-1]), :] = np.reshape(x > 0,
-                                                                                                      (-1, x.shape[-1])
-                                                                                                      , order='F')
-            # Only sort/count states every 5 iterations
-            if new_count < microstates[name].shape[0]:
-                microstates_count[name] = new_count
-                continue
-            else:
-                microstates_count[name] = 0
+                # TensorEfficiency.accumulate_ensemble stores the the identity of each observed
+                # microstate and the number of times that microstate occurred
+                TensorEfficiency.accumulate_ensemble(ensemble[name], sorted_states, index)
+            # If the current layer is the final layer, record the class prediction
+            # if isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear):
 
-            # TensorEfficiency.sort_microstates aggregates microstates by sorting
-            sorted_states, index = TensorEfficiency.sort_microstates(microstates[name], True)
+        # Calculate efficiency and entropy of each layer
+        layer_metrics = {}
+        metrics = ['efficiency', 'entropy', 'max_entropy']
+        for layer, states in ensemble.items():
+            layer_metrics[layer] = {key: value for key, value in
+                                    zip(metrics, TensorEfficiency.layer_efficiency(states))}
+        for hook in hooklist:
+            hook.remove() #remove our output recording hooks from the network
 
-            # TensorEfficiency.accumulate_ensemble stores the the identity of each observed
-            # microstate and the number of times that microstate occurred
-            TensorEfficiency.accumulate_ensemble(ensemble[name], sorted_states, index)
-        # If the current layer is the final layer, record the class prediction
-        # if isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear):
+        # Calculate network efficiency and aIQ, with beta=2
+        net_efficiency = TensorEfficiency.network_efficiency([m['efficiency'] for m in layer_metrics.values()])
+        #print('AiQ Calc Execution time: {}'.format(time_lib.time() - start_time))
+        # Return AiQ along with our metrics
+        aiq_model.to(device)
+        aiq_model.mask_to_device(device)
+        return {'net_efficiency': net_efficiency, 'layer_metrics': layer_metrics}, (time_lib.time() - start_time)
 
-    # Calculate efficiency and entropy of each layer
-    layer_metrics = {}
-    metrics = ['efficiency', 'entropy', 'max_entropy']
-    for layer, states in ensemble.items():
-        layer_metrics[layer] = {key: value for key, value in zip(metrics, TensorEfficiency.layer_efficiency(states))}
-    sel_bkg_reject = {}
-    accuracy = np.average(accuracy_list)
-    auc_roc = np.average(roc_list)
-    #print(sel_bkg_reject_list)
-    for label in test_dataset.labels_list:
-        sel_bkg_reject.update({label: np.average([batch[label] for batch in sel_bkg_reject_list])})
-    metric = auc_roc #auc_roc or accuracy
-    # Calculate network efficiency and aIQ, with beta=2
-    net_efficiency = TensorEfficiency.network_efficiency([m['efficiency'] for m in layer_metrics.values()])
-    aiq = TensorEfficiency.aIQ(net_efficiency, metric, 2)
-
-    # Display information
-    #print('---------------------------------------')
-    #print('Network analysis using TensorEfficiency')
-    #print('---------------------------------------')
-    #for layer, metrics in layer_metrics.items():
-    #    print('({}) Layer Efficiency: {}'.format(layer, metrics['efficiency']))
-    #print('Network Efficiency: {}'.format(net_efficiency))
-    #print('Accuracy: {}'.format(accuracy))
-    #print('AUC ROC Score: {}'.format(auc_roc))
-    #print('aIQ: {}'.format(aiq))
-    #print('Execution time: {}'.format(time.time() - start_time))
-    #print('')
-    #Return AiQ along with our metrics
-    return {'AiQ':aiq,
-            'accuracy':accuracy,
-            'auc_roc':auc_roc,
-            'net_efficiency':net_efficiency,
-            'sel_bkg_reject':sel_bkg_reject,
-            'layer_metrics':layer_metrics}
 
 
 def train(model, optimizer, loss, train_loader, L1_factor=0.0001):
@@ -397,6 +360,31 @@ def plot_total_loss(model_set, model_totalloss_set, model_estop_set):
         tloss_plt.show()
         plt.close(tloss_plt)
 
+def plot_total_eff(model_set, model_eff_set, model_estop_set):
+    # Total loss over fine tuning
+    now = datetime.now()
+    time = now.strftime("%d-%m-%Y_%H-%M-%S")
+    for model, model_eff_iter, model_estop in zip(model_set, model_eff_set, model_estop_set):
+        tloss_plt = plt.figure()
+        tloss_ax = tloss_plt.add_subplot()
+        nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
+        filename = 'total_eff_{}b_{}.png'.format(nbits,time)
+        tloss_ax.plot(range(1, len(model_eff_iter) + 1), [z['net_efficiency'] for z in model_eff_iter], label='Net Efficiency',
+                     color='green')
+
+        # plot each stopping point
+        for stop in model_estop:
+            tloss_ax.axvline(stop, linestyle='--', color='r', alpha=0.3)
+        tloss_ax.set_xlabel('epochs')
+        tloss_ax.set_ylabel('Net Efficiency')
+        tloss_ax.grid(True)
+        tloss_ax.legend(loc='best')
+        tloss_ax.set_title('Total Net. Eff. Across pruning & fine tuning {}b model'.format(nbits))
+        tloss_plt.tight_layout()
+        tloss_plt.savefig(path.join(options.outputDir,filename))
+        tloss_plt.show()
+        plt.close(tloss_plt)
+
 
 if __name__ == "__main__":
     parser = OptionParser()
@@ -413,6 +401,7 @@ if __name__ == "__main__":
     parser.add_option('-b', '--no_batnorm', action='store_false', dest='batnorm', default=True, help='disable BatchNormalization (BN) Layers ')
     parser.add_option('-r', '--no_l1reg', action='store_false', dest='l1reg', default=True, help='disable L1 Regularization totally ')
     parser.add_option('-m', '--model_set', type='str', dest='model_set', default='32,12,8,6,4', help='comma separated list of which bit widths to run')
+    parser.add_option('-n', '--net_efficiency', action='store_true', dest='efficiency_calc', default=False, help='Enable Per-Epoch efficiency calculation (adds train time)')
     (options,args) = parser.parse_args()
     yamlConfig = parse_config(options.config)
     #3938
@@ -498,9 +487,9 @@ if __name__ == "__main__":
     bit_params_set = []
     model_totalloss_set = []
     model_estop_set = []
-
+    model_eff_set = []
     model_totalloss_json_dict = {}
-
+    model_eff_json_dict = {}
     base_quant_accuracy_score, base_accuracy_score = None, None
 
     first_run = True
@@ -563,9 +552,11 @@ if __name__ == "__main__":
         bit_params = []
         model_loss = [[], []]  # Train, Val
         model_estop = []
+        model_eff = []
         epoch_counter = 0
         pruned_params = 0
         nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
+        last_stop = 0
         print("~!~!~!~!~!~!~!! Starting Train/Prune Cycle for {}b model! !!~!~!~!~!~!~!~".format(nbits))
         for prune_value in prune_value_set:
             # Epoch specific plot values
@@ -574,7 +565,7 @@ if __name__ == "__main__":
             val_roc_auc_scores_list = []
             avg_precision_scores = []
             accuracy_scores = []
-
+            iter_eff = []
             early_stopping = EarlyStopping(patience=options.patience, verbose=True)
 
             model.update_masks(prune_mask)  # Make sure to update the masks within the model
@@ -615,6 +606,11 @@ if __name__ == "__main__":
                 val_roc_auc_score = np.average(val_roc_auc_scores_list)
                 val_avg_precision = np.average(val_avg_precision_list)
 
+                if options.efficiency_calc:
+                    aiq_dict, aiq_time = calc_AiQ(model)
+                    epoch_eff = aiq_dict['net_efficiency']
+                    iter_eff.append(aiq_dict)
+
                 avg_train_losses.append(train_loss.tolist())
                 avg_valid_losses.append(valid_loss.tolist())
                 avg_precision_scores.append(val_avg_precision)
@@ -624,7 +620,11 @@ if __name__ == "__main__":
                 print('[epoch %d] val batch loss: %.7f' % (epoch + 1, valid_loss))
                 print('[epoch %d] val ROC AUC Score: %.7f' % (epoch + 1, val_roc_auc_score))
                 print('[epoch %d] val Avg Precision Score: %.7f' % (epoch + 1, val_avg_precision))
-
+                print('[epoch %d] aIQ Calc Time: %.7f seconds' % (epoch + 1, aiq_time))
+                if options.efficiency_calc:
+                    print('[epoch %d] Model Efficiency: %.7f' % (epoch + 1, epoch_eff))
+                    for layer in aiq_dict["layer_metrics"]:
+                        print('[epoch %d]\t Layer %s Efficiency: %.7f' % (epoch + 1, layer, aiq_dict['layer_metrics'][layer]['efficiency']))
                 # Check if we need to early stop
                 early_stopping(valid_loss, model)
                 if early_stopping.early_stop:
@@ -653,13 +653,16 @@ if __name__ == "__main__":
                 minposs = options.epochs
             model_loss[0].extend(avg_train_losses[:minposs])
             model_loss[1].extend(avg_valid_losses[:minposs])
+            model_eff.extend(iter_eff[:minposs])
 
             # save position of estop overall app epochs
             model_estop.append(epoch_counter - ((len(avg_valid_losses)) - minposs))
 
+
             # update our epoch counter to represent where the model actually stopped training
             epoch_counter -= ((len(avg_valid_losses)) - minposs)
 
+            nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
             # Plot losses for this iter
 
             loss_ax.axvline(minposs, linestyle='--', color='r', label='Early Stopping Checkpoint')
@@ -667,13 +670,32 @@ if __name__ == "__main__":
             loss_ax.set_ylabel('loss')
             loss_ax.grid(True)
             loss_ax.legend()
-            filename = 'loss_plot_e{}_{}_.png'.format(epoch_counter,time)
+            filename = 'loss_plot_{}b_e{}_{}_.png'.format(nbits,epoch_counter,time)
+            loss_ax.set_title('Loss from epoch {} to {}, {}b model'.format(last_stop,epoch_counter,nbits))
             loss_plt.savefig(path.join(options.outputDir, filename), bbox_inches='tight')
             loss_plt.show()
             plt.close(loss_plt)
+            if options.efficiency_calc:
+                # Plot & save eff for this iteration
+                loss_plt = plt.figure()
+                loss_ax = loss_plt.add_subplot()
+                loss_ax.set_title('Net Eff. from epoch {} to {}, {}b model'.format(last_stop+1, epoch_counter, nbits))
+                loss_ax.plot(range(last_stop+1, len(iter_eff) + last_stop+1), [z['net_efficiency'] for z in iter_eff], label='Net Efficiency', color='green')
+
+                #loss_ax.plot(range(1, len(iter_eff) + 1), [z["layer_metrics"][layer]['efficiency'] for z in iter_eff])
+                loss_ax.axvline(last_stop+minposs, linestyle='--', color='r', label='Early Stopping Checkpoint')
+                loss_ax.set_xlabel('epochs')
+                loss_ax.set_ylabel('Net Efficiency')
+                loss_ax.grid(True)
+                loss_ax.legend()
+                filename = 'eff_plot_{}b_e{}_{}_.png'.format(nbits,epoch_counter,time)
+                loss_plt.savefig(path.join(options.outputDir, filename), bbox_inches='tight')
+                loss_plt.show()
+                plt.close(loss_plt)
 
             # Prune & Test model
-            nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
+            last_stop = epoch_counter - ((len(avg_valid_losses)) - minposs)
+
             # Time for filenames
             now = datetime.now()
             time = now.strftime("%d-%m-%Y_%H-%M-%S")
@@ -700,7 +722,7 @@ if __name__ == "__main__":
                 base_quant_accuracy_score = np.average(accuracy_score_value_list)
                 base_quant_roc_score = np.average(roc_auc_score_list)
                 filename = path.join(options.outputDir, 'weight_dist_{}b_qBase_{}.png'.format(nbits, time))
-                plot_weights.plot_kernels(model,text=' (Unpruned Quant Model)', output=filename)
+                plot_weights.plot_kernels(model, text=' (Unpruned Quant Model)', output=filename)
                 if not path.exists(path.join(options.outputDir,'models','{}b'.format(nbits))):
                     os.makedirs(path.join(options.outputDir,'models','{}b'.format(nbits)))
                 model_filename = path.join(options.outputDir,'models','{}b'.format(nbits), "{}b_unpruned_{}.pth".format(nbits, time))
@@ -740,10 +762,11 @@ if __name__ == "__main__":
         prune_roc_set.append(prune_roc_results)
         model_totalloss_set.append(model_loss)
         model_estop_set.append(model_estop)
-        model_totalloss_json_dict.update({nbits:[model_loss,model_estop]})
+        model_eff_set.append(model_eff)
+        model_totalloss_json_dict.update({nbits:[model_loss,model_eff,model_estop]})
 
     filename = 'model_losses_{}.json'.format(options.model_set.replace(",","_"))
-    with open(os.path.join(options.outputDir, 'model_losses.json'), 'w') as fp:
+    with open(os.path.join(options.outputDir, filename), 'w') as fp:
         json.dump(model_totalloss_json_dict, fp)
 
     if base_quant_params == None:
@@ -758,5 +781,6 @@ if __name__ == "__main__":
                         [base_quant_params, base_quant_roc_score]]
     # Plot metrics
     plot_total_loss(model_set, model_totalloss_set, model_estop_set)
+    plot_total_eff(model_set,model_eff_set,model_estop_set)
     plot_metric_vs_bitparam(model_set,prune_result_set,bit_params_set,base_acc_set,metric_text='ACC')
     plot_metric_vs_bitparam(model_set, prune_result_set, bit_params_set, base_roc_set, metric_text='ROC')

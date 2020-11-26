@@ -21,7 +21,7 @@ python pytorch_example.py
 
 import os, time
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import TensorEfficiency
+from tools import TensorEfficiency
 import torch
 import jet_dataset
 import models

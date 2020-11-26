@@ -1,9 +1,8 @@
 import torch.nn as nn
 import torch
 import numpy as np
-import pandas as pd
 import models
-import ae_wav_dataset
+from slider_autoencoder import ae_wav_dataset
 import matplotlib.pyplot as plt
 from optparse import OptionParser
 from sklearn.metrics import mean_squared_error
@@ -11,16 +10,12 @@ import torch.optim as optim
 import torch.nn.utils.prune as prune
 import yaml
 import math
-import seaborn as sn
-import plot_weights
-from pytorchtools import EarlyStopping
-import copy
+from tools import plot_weights
+from tools.pytorchtools import EarlyStopping
 from datetime import datetime
 import os.path as path
 import os
-import re
-import glob
-import itertools
+
 
 def parse_config(config_file) :
     print("Loading configuration from", config_file)
@@ -258,6 +253,7 @@ if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
+    print("Using Device: {}".format(device))
 
     # Set Batch size and split value
     batch_size = 512 #Keras Model is 512
@@ -291,16 +287,16 @@ if __name__ == "__main__":
 
     # Setup dataloaders with our dataset
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
-                                              shuffle=True, num_workers=10, pin_memory=True)
+                                              shuffle=True, num_workers=0, pin_memory=True)
 
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
-                                              shuffle=True, num_workers=10, pin_memory=True)
+                                              shuffle=True, num_workers=0, pin_memory=True)
     test_loader_01 = torch.utils.data.DataLoader(test_dataset_01, batch_size=test_size1,
-                                              shuffle=True, num_workers=10, pin_memory=True)
+                                              shuffle=True, num_workers=0, pin_memory=True)
     test_loader_03 = torch.utils.data.DataLoader(test_dataset_03, batch_size=test_size3,
-                                              shuffle=True, num_workers=10, pin_memory=True)
+                                              shuffle=True, num_workers=0, pin_memory=True)
     test_loader_05 = torch.utils.data.DataLoader(test_dataset_05, batch_size=test_size5,
-                                              shuffle=True, num_workers=10, pin_memory=True)
+                                              shuffle=True, num_workers=0, pin_memory=True)
 
     for model, prune_mask in zip(model_set, prune_mask_set):
         # Model specific results/data to plot
@@ -325,11 +321,11 @@ if __name__ == "__main__":
 
             optimizer = optim.Adam(model.parameters(), lr=0.001) #Stock DCASE2020 T2 LR is 0.001
             criterion = nn.MSELoss() #Keras model uses MSE
-            LRScheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,mode='min',factor=0.5,
-                                                               patience=1,verbose=True,eps=0.001,
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,mode='min',factor=0.5,
+                                                               patience=0,verbose=True,eps=0.001,
                                                                cooldown=4,min_lr=1e-5)
 
-            L1_factor = 0.0001  # Default Keras L1 Loss
+            L1_factor = 0  # Default Keras L1 Loss
             estop = False
 
             if options.lottery:  # If using lottery ticket method, reset all weights to first initalized vals
@@ -362,11 +358,12 @@ if __name__ == "__main__":
                 avg_train_losses.append(train_loss)
                 avg_valid_losses.append(valid_loss)
 
-                LRScheduler.step(valid_loss)
+                scheduler.step(valid_loss)
 
                 # Print epoch statistics
                 print('[epoch %d] train batch loss: %.7f' % (epoch + 1, train_loss))
                 print('[epoch %d] val batch loss: %.7f' % (epoch + 1, valid_loss))
+                print('[epoch %d] Current Learning Rate: %.7f' % (epoch + 1, optimizer.param_groups[0]['lr']))
 
                 # Check if we need to early stop
                 early_stopping(valid_loss, model)

@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pt-jet-class-job-ft-$PRECb-$RAND
+  name: pt-jet-class-job-ft-nol1-nostatsbn-$PRECb
   labels:
     jobgroup: pt-jet-class-job
 spec:
@@ -16,7 +16,7 @@ spec:
         args:
         - /opt/repo/pytorch-jet-classify/iter_prune.py
         - -i
-        - /ptjetclassvol/rand_train_data/$RAND/
+        - /ptjetclassvol/rand_train_data/0/
         - -t
         - /ptjetclassvol/train_data/test/
         - -c
@@ -24,9 +24,12 @@ spec:
         - -e
         - "250"
         - -o
-        - /ptjetclassvol/train_output/FT_$RAND/
+        - /ptjetclassvol/train_output/FT_0_NoL1_NoStatsBN/
         - -m
         - "$PREC"
+        - -n
+        - -r
+        - -s
         volumeMounts:
         - mountPath: /ptjetclassvol
           name: pt-jet-class-vol

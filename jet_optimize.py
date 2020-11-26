@@ -1,27 +1,20 @@
 import torch.nn as nn
 import torch
 import numpy as np
-import pandas as pd
 import models
 import jet_dataset
-import matplotlib.pyplot as plt
 from optparse import OptionParser
-from sklearn.metrics import accuracy_score, roc_curve, confusion_matrix, average_precision_score, auc, roc_auc_score
+from sklearn.metrics import accuracy_score, average_precision_score, roc_auc_score
 from iter_prune import l1_regularizer, parse_config
 import torch.optim as optim
 import math
-import plot_weights
-from pytorchtools import EarlyStopping
-import copy
+from tools.pytorchtools import EarlyStopping
 from datetime import datetime
 import os
 import os.path as path
 import ax
-from ax.plot.contour import plot_contour
-from ax.plot.trace import optimization_trace_single_method
-from ax.service.managed_loop import optimize
 #from ax.utils.notebook.plotting import render
-from ax.utils.tutorials.cnn_utils import train, evaluate
+from ax.utils.tutorials.cnn_utils import train
 
 tested_sizes = []
 

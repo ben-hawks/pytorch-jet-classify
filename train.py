@@ -1,6 +1,5 @@
 import torch.nn as nn
 import torch
-import numpy as np
 import pandas as pd
 import models
 import jet_dataset
@@ -8,12 +7,10 @@ import matplotlib.pyplot as plt
 from optparse import OptionParser
 from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix, average_precision_score, auc
 import torch.optim as optim
-import torch.nn.utils.prune as prune
 import yaml
 import math
 import seaborn as sn
-import plot_weights
-import copy
+from tools import plot_weights
 from datetime import datetime
 import os
 
@@ -224,7 +221,7 @@ if __name__ == "__main__":
 
     torch.save(current_model.state_dict(), options.outputDir + 'JetClassifyModel_' + str(time) + '.pt')
     os.makedirs(options.outputDir+'weight_dists/',exist_ok=True)
-    plot_weights.plot_kernels(current_model,text=" (Locally Pruned)",
+    plot_weights.plot_kernels(current_model, text=" (Locally Pruned)",
                               output=options.outputDir+'weight_dists/'+'weight_dist_' + str(time) + '.png')
 
 
