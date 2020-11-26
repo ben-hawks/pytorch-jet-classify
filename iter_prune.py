@@ -409,7 +409,7 @@ if __name__ == "__main__":
                        0]  # Last 0 is so the final iteration can fine tune before testing
 
     if not path.exists(options.outputDir): #create given output directory if it doesnt exist
-        os.makedirs(options.outputDir)
+        os.makedirs(options.outputDir, exist_ok=True)
 
     prune_mask_set = [
         {  # Float Model
