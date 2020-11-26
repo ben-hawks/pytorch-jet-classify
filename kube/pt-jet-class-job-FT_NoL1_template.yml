@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: pt-jet-class-job-ft-nol1-$PRECb
   labels:
-    jobgroup: pt-jet-class-job
+    jobgroup: pt-jet-class-job-bn
 spec:
   template:
     spec:

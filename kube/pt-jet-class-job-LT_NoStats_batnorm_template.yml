@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: pt-jet-class-job-lt-nostatsbn-$PRECb
   labels:
-    jobgroup: pt-jet-class-job
+    jobgroup: pt-jet-class-job-bn
 spec:
   template:
     spec:
@@ -24,7 +24,7 @@ spec:
         - -e
         - "250"
         - -o
-        - /ptjetclassvol/train_output/LT_0_NoAffBN/
+        - /ptjetclassvol/train_output/LT_0_BNNoStat/
         - -L
         - -m
         - "$PREC"

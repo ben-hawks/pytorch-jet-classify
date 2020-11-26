@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: pt-jet-class-job-ft-nostatsbn-$PRECb
   labels:
-    jobgroup: pt-jet-class-job
+    jobgroup: pt-jet-class-job-bn
 spec:
   template:
     spec:
@@ -29,7 +29,6 @@ spec:
         - "$PREC"
         - -n
         - -s
-        - -
         volumeMounts:
         - mountPath: /ptjetclassvol
           name: pt-jet-class-vol
