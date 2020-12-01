@@ -423,7 +423,7 @@ try:
         loadmodel = models.three_layer_model_batnorm_masked(prune_mask_set, bn_affine=options.bn_affine,
                                                         bn_stats=options.bn_stats)
     else:
-        loadmodel = models.three_layer_model_masked(prune_mask_set),  # 32b
+        loadmodel = models.three_layer_model_masked(prune_mask_set)  # 32b
 
     float_model_set, model_max_params = gen_model_dict(loadmodel, os.path.join(dir, '32b'))
 except Exception as e:
