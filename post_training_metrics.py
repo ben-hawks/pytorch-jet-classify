@@ -478,7 +478,7 @@ aiq_ax.plot([key for key in float_AiQ],[z['AiQ'] for z in float_AiQ.values()], l
 aiq_ax.plot([key for key in quant_12b_AiQ],[z['AiQ'] for z in quant_12b_AiQ.values()], label='12b Quantized')
 aiq_ax.plot([key for key in quant_6b_AiQ],[z['AiQ'] for z in quant_6b_AiQ.values()], label='6b Quantized')
 aiq_ax.plot([key for key in quant_4b_AiQ],[z['AiQ'] for z in quant_4b_AiQ.values()], label='4b Quantized')
-aiq_ax.plot([key for key in quant_batnorm_AiQ],[z['AiQ'] for z in quant_batnorm_AiQ.values()], label='8b Quantized')
+#aiq_ax.plot([key for key in quant_batnorm_AiQ],[z['AiQ'] for z in quant_batnorm_AiQ.values()], label='8b Quantized')
 aiq_ax.legend(loc='best')
 aiq_plot.savefig('aIQ_BOPS.png')
 aiq_plot.show()
@@ -496,7 +496,7 @@ aiq_ax.plot([key for key in float_AiQ],[z['auc_roc'] for z in float_AiQ.values()
 aiq_ax.plot([key  for key in quant_12b_AiQ],[z['auc_roc'] for z in quant_12b_AiQ.values()], label='12b Quantized')
 aiq_ax.plot([key for key in quant_6b_AiQ],[z['auc_roc'] for z in quant_6b_AiQ.values()], label='6b Quantized')
 aiq_ax.plot([key for key in quant_4b_AiQ],[z['auc_roc'] for z in quant_4b_AiQ.values()], label='4b Quantized')
-aiq_ax.plot([key for key in quant_batnorm_AiQ],[z['auc_roc'] for z in quant_batnorm_AiQ.values()], label='8b Quantized')
+#aiq_ax.plot([key for key in quant_batnorm_AiQ],[z['auc_roc'] for z in quant_batnorm_AiQ.values()], label='8b Quantized')
 aiq_ax.legend(loc='best')
 aiq_plot.savefig(os.path.join(options.outputDir,'auc_roc_BOPS.png'))
 aiq_plot.show()
@@ -514,7 +514,7 @@ aiq_ax.plot([key for key in float_AiQ],[z['accuracy'] for z in float_AiQ.values(
 aiq_ax.plot([key for key in quant_12b_AiQ],[z['accuracy'] for z in quant_12b_AiQ.values()], label='12b Quantized')
 aiq_ax.plot([key for key in quant_6b_AiQ],[z['accuracy'] for z in quant_6b_AiQ.values()], label='6b Quantized')
 aiq_ax.plot([key for key in quant_4b_AiQ],[z['accuracy'] for z in quant_4b_AiQ.values()], label='4b Quantized')
-aiq_ax.plot([key for key in quant_batnorm_AiQ],[z['accuracy'] for z in quant_batnorm_AiQ.values()], label='8b Quantized')
+#aiq_ax.plot([key for key in quant_batnorm_AiQ],[z['accuracy'] for z in quant_batnorm_AiQ.values()], label='8b Quantized')
 aiq_ax.legend(loc='best')
 aiq_plot.savefig(os.path.join(options.outputDir,'acc_BOPS.png'))
 aiq_plot.show()
@@ -533,7 +533,7 @@ eff_ax.plot([key for key in float_AiQ],[z['net_efficiency'] for z in float_AiQ.v
 eff_ax.plot([key for key in quant_12b_AiQ],[z['net_efficiency'] for z in quant_12b_AiQ.values()], label='12b Quantized')
 eff_ax.plot([key for key in quant_6b_AiQ],[z['net_efficiency'] for z in quant_6b_AiQ.values()], label='6b Quantized')
 eff_ax.plot([key for key in quant_4b_AiQ],[z['net_efficiency'] for z in quant_4b_AiQ.values()], label='4b Quantized')
-eff_ax.plot([key for key in quant_batnorm_AiQ],[z['net_efficiency'] for z in quant_batnorm_AiQ.values()], label='8b Quantized')
+#eff_ax.plot([key for key in quant_batnorm_AiQ],[z['net_efficiency'] for z in quant_batnorm_AiQ.values()], label='8b Quantized')
 eff_ax.legend(loc='best')
 eff_plot.savefig(os.path.join(options.outputDir,'t_eff_BOPS.png'))
 eff_plot.show()
@@ -554,7 +554,7 @@ for label in test_dataset.labels_list:
     aiq_ax.plot([key for key in quant_12b_AiQ],[z['sel_bkg_reject'][label]  for z in quant_12b_AiQ.values()], label='12b Quantized')
     aiq_ax.plot([key for key in quant_6b_AiQ],[z['sel_bkg_reject'][label]  for z in quant_6b_AiQ.values()], label='6b Quantized')
     aiq_ax.plot([key for key in quant_4b_AiQ], [z['sel_bkg_reject'][label] for z in quant_4b_AiQ.values()], label='4b Quantized')
-    aiq_ax.plot([key for key in quant_batnorm_AiQ],[z['sel_bkg_reject'][label] for z in quant_batnorm_AiQ.values()], label='8b Quantized')
+    #aiq_ax.plot([key for key in quant_batnorm_AiQ],[z['sel_bkg_reject'][label] for z in quant_batnorm_AiQ.values()], label='8b Quantized')
     aiq_ax.legend(loc='best')
     aiq_plot.savefig(os.path.join(options.outputDir,'bgd_eff_{}_BOPS.png'.format(label)))
     aiq_plot.show()
@@ -563,7 +563,7 @@ for label in test_dataset.labels_list:
 #Just FC1-3
 eff_plot = plt.figure()
 eff_ax = eff_plot.add_subplot()
-eff_ax.set_title("Efficiency vs BOPS (HLS4ML Jet Tagging Model w/ LTH)")
+eff_ax.set_title("Efficiency vs BOPS (HLS4ML Jet Tagging Model)")
 eff_ax.grid(True)
 eff_ax.set_xlabel('Binary Operations (BOPS)')
 eff_ax.set_xscale("log")
@@ -586,9 +586,9 @@ for layer,color in zip(layer_list,colors):
     eff_ax.plot([key for key in quant_4b_AiQ],
                 [z['layer_metrics'][layer]['efficiency']  for z in quant_4b_AiQ.values()]
                 , label='4b Quant - ' + layer + ' Eff.', linestyle=(0, (3, 5, 1, 5, 1, 5)), color=color)
-    eff_ax.plot([key for key in quant_batnorm_AiQ],
-                [z['layer_metrics'][layer]['efficiency']  for z in quant_batnorm_AiQ.values()]
-                , label='8b Quant (BN) - ' + layer + ' Eff.', linestyle=(0, (3, 1, 1, 1, 1, 1)), color=color)
+  #  eff_ax.plot([key for key in quant_batnorm_AiQ],
+  #              [z['layer_metrics'][layer]['efficiency']  for z in quant_batnorm_AiQ.values()]
+  #              , label='8b Quant (BN) - ' + layer + ' Eff.', linestyle=(0, (3, 1, 1, 1, 1, 1)), color=color)
 eff_ax.legend(loc='best')
 eff_plot.savefig(os.path.join(options.outputDir,'layer_eff_BOPS.png'))
 eff_plot.show()
