@@ -241,12 +241,12 @@ def calc_AiQ(model,model_file):
             if ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
                     or (
             isinstance(module, torch.nn.BatchNorm1d)):  # Record @ BN output except last layer (since last has no BN)
-                model.append(module.register_forward_hook(activation_outputs))
+                module.register_forward_hook(activation_outputs)
                 layer_list.append(name)  # Probably a better way to do this, but it works,
         else:
             if (isinstance(module, torch.nn.Linear) or isinstance(module,
                                                                   qnn.QuantLinear)):  # We only care about linear layers except the last
-                model.append(module.register_forward_hook(activation_outputs))
+                module.register_forward_hook(activation_outputs)
                 layer_list.append(name)  # Probably a better way to do this, but it works,
     # Process data using torch dataloader, in this case we
     for i, data in enumerate(test_loader, 0):
