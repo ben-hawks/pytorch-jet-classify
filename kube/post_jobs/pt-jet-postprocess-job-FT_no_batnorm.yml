@@ -23,6 +23,7 @@ spec:
         - /ptjetclassvol/train_output/FT_0_NoBN/aiq_plots/
         - -n
         - "FT_0_NoBN"
+        - -b
         volumeMounts:
         - mountPath: /ptjetclassvol
           name: pt-jet-class-vol
