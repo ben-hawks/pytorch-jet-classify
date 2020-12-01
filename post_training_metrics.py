@@ -481,7 +481,7 @@ for model_bops, model_file in sorted(float_model_set.items()):
         loadmodel = models.three_layer_model_batnorm_masked(prune_mask_set, bn_affine=options.bn_affine,
                                                         bn_stats=options.bn_stats)
     else:
-        loadmodel = models.three_layer_model_masked(prune_mask_set),  # 32b
+        loadmodel = models.three_layer_model_masked(prune_mask_set)  # 32b
 
     print('Calculating AiQ for 32b, ' + str(model_bops) + ' BOPS')
     float_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '32b', model_file))})
