@@ -219,23 +219,35 @@ def calc_AiQ(model,model_file):
     roc_list = []
     sel_bkg_reject_list = []
     # Initialize arrays for storing microstates
-    microstates = {name: np.ndarray([]) for name, module in model.named_modules() if
-                   ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
-                   or (isinstance(module, torch.nn.BatchNorm1d))}
-    microstates_count = {name: 0 for name, module in model.named_modules() if
-                         ((isinstance(module, torch.nn.Linear) or isinstance(module,qnn.QuantLinear)) and name == 'fc4') \
-                         or (isinstance(module, torch.nn.BatchNorm1d))}
+    if options.batnorm:
+        microstates = {name: np.ndarray([]) for name, module in model.named_modules() if
+                       ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
+                       or (isinstance(module, torch.nn.BatchNorm1d))}
+        microstates_count = {name: 0 for name, module in model.named_modules() if
+                             ((isinstance(module, torch.nn.Linear) or isinstance(module,qnn.QuantLinear)) and name == 'fc4') \
+                             or (isinstance(module, torch.nn.BatchNorm1d))}
+    else:
+        microstates = {name: np.ndarray([]) for name, module in model.named_modules() if
+                       isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)}
+        microstates_count = {name: 0 for name, module in model.named_modules() if
+                             isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)}
 
     activation_outputs = SaveOutput()  # Our forward hook class, stores the outputs of each layer it's registered to
 
     # register a forward hook to get and store the activation at each Linear layer while running
     layer_list = []
     for name, module in model.named_modules():
-        if ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
-          or (isinstance(module, torch.nn.BatchNorm1d)):  # Record @ BN output except last layer (since last has no BN)
-            module.register_forward_hook(activation_outputs)
-            layer_list.append(name)  # Probably a better way to do this, but it works,
-
+        if options.batnorm:
+            if ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
+                    or (
+            isinstance(module, torch.nn.BatchNorm1d)):  # Record @ BN output except last layer (since last has no BN)
+                model.append(module.register_forward_hook(activation_outputs))
+                layer_list.append(name)  # Probably a better way to do this, but it works,
+        else:
+            if (isinstance(module, torch.nn.Linear) or isinstance(module,
+                                                                  qnn.QuantLinear)):  # We only care about linear layers except the last
+                model.append(module.register_forward_hook(activation_outputs))
+                layer_list.append(name)  # Probably a better way to do this, but it works,
     # Process data using torch dataloader, in this case we
     for i, data in enumerate(test_loader, 0):
         activation_outputs.clear()
