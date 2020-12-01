@@ -100,7 +100,7 @@ def ae_MSE(model, model_file, test_loaders):
     print("MSE: {}".format(np.mean(errors_list)))
     return np.mean(errors_list)
 
-def gen_model_dict(model, dir):
+def gen_model_dict(bopmodel, dir):
     # Provide an instance of the model you're loading (to calculate # params)
     # and the path to folder containing model files, returns a dict with the format {pruned params:path to model}
     # and the total count of params in that model. Excepts if a model with a different total param count is found
@@ -114,9 +114,9 @@ def gen_model_dict(model, dir):
         #print(dir_list)
         for file in dir_list:
             try:
-                model.load_state_dict(torch.load(os.path.join(dir, file), map_location=device))
-                count, total_cnt, _, _ = countNonZeroWeights(model)
-                bops = calc_BOPS(model)
+                bopmodel.load_state_dict(torch.load(os.path.join(dir, file), map_location=device))
+                count, total_cnt, _, _ = countNonZeroWeights(bopmodel)
+                bops = calc_BOPS(bopmodel)
                 if first: #Assume first alphabetical is the first model, for the sake of checking all pth are same model
                     total_param = total_cnt
                     first = False
@@ -155,10 +155,10 @@ def gen_bo_model_dict(dir):
                 "fc1": torch.ones(dims[0], 16),
                 "fc2": torch.ones(dims[1], dims[0]),
                 "fc3": torch.ones(dims[2], dims[1])}
-                model = models.three_layer_model_bv_tunable(prune_masks,size) #Shouldnt have to worry about correct precision for simple param count (for now)
-                model.load_state_dict(torch.load(os.path.join(dir, file), map_location=device))
-                count, total_param, _, _ = countNonZeroWeights(model)
-                bops = calc_BOPS(model)
+                bomodel = models.three_layer_model_bv_tunable(prune_masks,size) #Shouldnt have to worry about correct precision for simple param count (for now)
+                bomodel.load_state_dict(torch.load(os.path.join(dir, file), map_location=device))
+                count, total_param, _, _ = countNonZeroWeights(bomodel)
+                bops = calc_BOPS(bomodel)
                 model_dict.update({int(bops): file})
             except Exception as e:
                 print("Warning! Failed to load file " + file)
@@ -356,6 +356,14 @@ parser.add_option('-t', '--test', action='store', type='string', dest='test', de
                   help='Location of test data set')
 parser.add_option('-c','--config', action='store',type='string',dest='config', default='/opt/repo/pytorch-jet-classify/configs/train_config_threelayer.yml', help='tree name')
 parser.add_option('-n','--name', action='store',type='string',dest='name', default='aIQ_results.json', help='JSON Output Filename')
+parser.add_option('-a', '--no_bn_affine', action='store_false', dest='bn_affine', default=True,
+                  help='disable BN Affine Parameters')
+parser.add_option('-s', '--no_bn_stats', action='store_false', dest='bn_stats', default=True,
+                  help='disable BN running statistics')
+parser.add_option('-b', '--no_batnorm', action='store_false', dest='batnorm', default=True,
+                  help='disable BatchNormalization (BN) Layers ')
+parser.add_option('-r', '--no_l1reg', action='store_false', dest='l1reg', default=True,
+                  help='disable L1 Regularization totally ')
 
 (options,args) = parser.parse_args()
 
@@ -408,52 +416,112 @@ test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=25000,
 
 dir = "model_files/"
 dir = options.model_files
+
+
 try:
-    float_model_set, model_max_params = gen_model_dict(models.three_layer_model_batnorm_masked(prune_mask_set), os.path.join(dir, '32b'))
+    if options.batnorm:
+        loadmodel = models.three_layer_model_batnorm_masked(prune_mask_set, bn_affine=options.bn_affine,
+                                                        bn_stats=options.bn_stats)
+        # models.three_layer_model_bv_batnorm_masked(prune_mask_set,12, bn_affine=options.bn_affine, bn_stats=options.bn_stats)
+    else:
+        loadmodel = models.three_layer_model_masked(prune_mask_set),  # 32b
+        # models.three_layer_model_bv_masked(prune_mask_set[1], 12)  # 12b
+
+    float_model_set, model_max_params = gen_model_dict(loadmodel, os.path.join(dir, '32b'))
 except:
     float_model_set, model_max_params = {},0
+
+
 try:
-    quant_model_set_4b, quant_4b_max_params = gen_model_dict(models.three_layer_model_bv_batnorm_masked(prune_mask_set,4), os.path.join(dir, '4b'))
+    if options.batnorm:
+        loadmodel = models.three_layer_model_bv_batnorm_masked(prune_mask_set,4, bn_affine=options.bn_affine, bn_stats=options.bn_stats)
+    else:
+        loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 4)
+
+    quant_model_set_4b, quant_4b_max_params = gen_model_dict(loadmodel, os.path.join(dir, '4b'))
 except:
     quant_model_set_4b, quant_4b_max_params = {},0
+
+
 try:
-    quant_model_set_6b, quant_6b_max_params = gen_model_dict(models.three_layer_model_bv_batnorm_masked(prune_mask_set,6), os.path.join(dir, '6b'))
+    if options.batnorm:
+        loadmodel = models.three_layer_model_bv_batnorm_masked(prune_mask_set,6, bn_affine=options.bn_affine, bn_stats=options.bn_stats)
+    else:
+        loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 6)
+
+    quant_model_set_6b, quant_6b_max_params = gen_model_dict(loadmodel, os.path.join(dir, '6b'))
 except:
     quant_model_set_6b, quant_6b_max_params = {},0
+
+
 try:
-    quant_model_set_12b, quant_12b_max_params = gen_model_dict(models.three_layer_model_bv_batnorm_masked(prune_mask_set,12), os.path.join(dir, '12b'))
+    if options.batnorm:
+        loadmodel = models.three_layer_model_bv_batnorm_masked(prune_mask_set,12, bn_affine=options.bn_affine, bn_stats=options.bn_stats)
+    else:
+        loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 12)
+
+    quant_model_set_12b, quant_12b_max_params = gen_model_dict(loadmodel, os.path.join(dir, '12b'))
 except:
     quant_model_set_12b, quant_12b_max_params = {},0
+
+
 try:
-    quant_batnorm_model_set, batnorm_max_params = gen_model_dict(models.three_layer_model_bv_batnorm_masked(prune_mask_set, 8), os.path.join(dir, '8b'))
+    if options.batnorm:
+        loadmodel = models.three_layer_model_bv_batnorm_masked(prune_mask_set,8, bn_affine=options.bn_affine, bn_stats=options.bn_stats)
+    else:
+        loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 8)
+
+    quant_batnorm_model_set, batnorm_max_params = gen_model_dict(loadmodel, os.path.join(dir, '8b'))
 except:
     quant_batnorm_model_set, batnorm_max_params = {},0
 
 #Run through each model set, calculating AiQ for each model in the set
 float_AiQ = {}
 for model_bops, model_file in sorted(float_model_set.items()):
+    if options.batnorm:
+        loadmodel = models.three_layer_model_batnorm_masked(prune_mask_set, bn_affine=options.bn_affine,
+                                                        bn_stats=options.bn_stats)
+    else:
+        loadmodel = models.three_layer_model_masked(prune_mask_set),  # 32b
+
     print('Calculating AiQ for 32b, ' + str(model_bops) + ' BOPS')
-    float_AiQ.update({model_bops: calc_AiQ(models.three_layer_model_batnorm_masked(prune_mask_set), os.path.join(dir, '32b', model_file))})
+    float_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '32b', model_file))})
 
 quant_4b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_4b.items()):
+    if options.batnorm:
+        loadmodel = models.three_layer_model_bv_batnorm_masked(prune_mask_set,4, bn_affine=options.bn_affine, bn_stats=options.bn_stats)
+    else:
+        loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 4)
     print('Calculating AiQ for 4b, ' + str(model_bops) + ' BOPS')
-    quant_4b_AiQ.update({model_bops: calc_AiQ(models.three_layer_model_bv_batnorm_masked(prune_mask_set,4), os.path.join(dir, '4b', model_file))})
+    quant_4b_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '4b', model_file))})
 
 quant_6b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_6b.items()):
+    if options.batnorm:
+        loadmodel = models.three_layer_model_bv_batnorm_masked(prune_mask_set,6, bn_affine=options.bn_affine, bn_stats=options.bn_stats)
+    else:
+        loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 6)
     print('Calculating AiQ for 6b, ' + str(model_bops) + ' BOPS')
-    quant_6b_AiQ.update({model_bops: calc_AiQ(models.three_layer_model_bv_batnorm_masked(prune_mask_set,6), os.path.join(dir, '6b',model_file))})
+    quant_6b_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '6b',model_file))})
 
 quant_12b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_12b.items()):
+    if options.batnorm:
+        loadmodel = models.three_layer_model_bv_batnorm_masked(prune_mask_set,12, bn_affine=options.bn_affine, bn_stats=options.bn_stats)
+    else:
+        loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 12)
     print('Calculating AiQ for 12b, ' + str(model_bops) + ' BOPS')
-    quant_12b_AiQ.update({model_bops: calc_AiQ(models.three_layer_model_bv_batnorm_masked(prune_mask_set,12), os.path.join(dir, '12b', model_file))})
+    quant_12b_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '12b', model_file))})
 
 quant_batnorm_AiQ = {}
 for model_bops, model_file in sorted(quant_batnorm_model_set.items()):
+    if options.batnorm:
+        loadmodel = models.three_layer_model_bv_batnorm_masked(prune_mask_set,8, bn_affine=options.bn_affine, bn_stats=options.bn_stats)
+    else:
+        loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 8)
     print('Calculating AiQ for 8b w/ BatchNorm, ' + str(model_bops) + ' BOPS')
-    quant_batnorm_AiQ.update({model_bops: calc_AiQ(models.three_layer_model_bv_batnorm_masked(prune_mask_set,8), os.path.join(dir,'8b',model_file))})
+    quant_batnorm_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir,'8b',model_file))})
 
 import json
 dump_dict={ '32b':float_AiQ,
