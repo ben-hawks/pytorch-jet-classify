@@ -1,9 +1,9 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pt-jet-class-job-ft-nol1-$RAND-$PRECb
+  name: pt-jet-postprocess-job-ft-nol1-$RAND
   labels:
-    jobgroup: pt-jet-class-job-bn
+    jobgroup: pt-jet-postprocess-job
 spec:
   template:
     spec:
@@ -14,21 +14,15 @@ spec:
         command:
         - "python"
         args:
-        - /opt/repo/pytorch-jet-classify/iter_prune.py
-        - -i
-        - /ptjetclassvol/rand_train_data/$RAND/
+        - /opt/repo/pytorch-jet-classify/post_training_metrics.py
         - -t
         - /ptjetclassvol/train_data/test/
-        - -c
-        - /opt/repo/pytorch-jet-classify/configs/train_config_threelayer.yml
-        - -e
-        - "250"
+        - -i
+        - /ptjetclassvol/train_output/FT_$RAND_NoL1/models/
         - -o
-        - /ptjetclassvol/train_output/FT_$RAND_NoL1/
-        - -m
-        - "$PREC"
+        - /ptjetclassvol/train_output/FT_$RAND_NoL1/aiq_plots/
         - -n
-        - -r
+        - "FT_$RAND_NoL1"
         volumeMounts:
         - mountPath: /ptjetclassvol
           name: pt-jet-class-vol
@@ -36,13 +30,11 @@ spec:
           mountPath: /opt/repo
         resources:
           limits:
-            memory: 8Gi
+            memory: 4Gi
             cpu: "4"
-            nvidia.com/gpu: "1"
           requests:
             memory: 2Gi
             cpu: "1"
-            nvidia.com/gpu: "1"
       initContainers:
       - name: init-clone-repo
         image: alpine/git

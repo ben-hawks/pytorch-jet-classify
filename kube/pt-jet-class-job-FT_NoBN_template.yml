@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pt-jet-class-job-ft-nol1-$RAND-$PRECb
+  name: pt-jet-class-job-ft-nobn-$RAND-$PRECb
   labels:
     jobgroup: pt-jet-class-job-bn
 spec:
@@ -24,11 +24,11 @@ spec:
         - -e
         - "250"
         - -o
-        - /ptjetclassvol/train_output/FT_$RAND_NoL1/
+        - /ptjetclassvol/train_output/FT_$RAND_NoBN/
         - -m
         - "$PREC"
         - -n
-        - -r
+        - -b
         volumeMounts:
         - mountPath: /ptjetclassvol
           name: pt-jet-class-vol
