@@ -9,7 +9,7 @@ mkdir -p ./jobs/NoBN
 mkdir -p ./jobs/NoL1
 for p in 32 12 6 4 #8
 do
-  for i in 0 25 50 75 100
+  for i in 0 25 50 75 90 100
   do
     cat pt-jet-class-job-FT_template.yml | sed "s/\$RAND/$i/" | sed "s/\$PREC/$p/" > ./jobs/FT/pt-jet-class-job-FT-$i-$p.yaml
     cat pt-jet-class-job-LT_template.yml | sed "s/\$RAND/$i/" | sed "s/\$PREC/$p/" > ./jobs/LT/pt-jet-class-job-LT-$i-$p.yaml

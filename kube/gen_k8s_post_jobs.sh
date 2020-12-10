@@ -3,7 +3,7 @@
 # Expand the template into multiple files, one for each item to be processed.
 
 mkdir -p ./post_jobs
-for i in 0 25 50 75 100
+for i in 0 25 50 75 90 100
 do
   cat pt-jet-postprocess-job-FT_template.yml | sed "s/\$RAND/$i/" > ./post_jobs/pt-jet-postprocess-job-FT-$i.yaml
   cat pt-jet-postprocess-job-LT_template.yml | sed "s/\$RAND/$i/" > ./post_jobs/pt-jet-postprocess-job-LT-$i.yaml
