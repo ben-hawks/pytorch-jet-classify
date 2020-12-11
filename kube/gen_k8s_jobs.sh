@@ -7,6 +7,7 @@ mkdir -p ./jobs/LT
 mkdir -p ./jobs/BN
 mkdir -p ./jobs/NoBN
 mkdir -p ./jobs/NoL1
+mkdir -p ./jobs/BO
 for p in 32 12 6 4 #8
 do
   for i in 0 25 50 75 90 100
@@ -21,4 +22,5 @@ do
   cat pt-jet-class-job-FT_NoAff_batnorm_template.yml | sed "s/\$PREC/$p/" > ./jobs/BN/pt-jet-class-job-FT-NoAff-batnorm-$p.yaml
   cat pt-jet-class-job-LT_NoAff_batnorm_template.yml | sed "s/\$PREC/$p/" > ./jobs/BN/pt-jet-class-job-LT-NoAff_batnorm-$p.yaml
   cat pt-jet-class-job-FT_NoL1_NoStatsBN_template.yml | sed "s/\$PREC/$p/" > ./jobs/BN/pt-jet-class-job-FT-NoL1-NoStatsBN-$p.yaml
+  cat pt-jet-bo-job_template.yml | sed "s/\$PREC/$p/" > ./jobs/BO/pt-jet-bo-job-$p.yaml
 done
