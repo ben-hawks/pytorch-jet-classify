@@ -576,6 +576,15 @@ if __name__ == "__main__":
             L1_factor = 0.0001  # Default Keras L1 Loss
             estop = False
 
+            if options.efficiency_calc and epoch_counter == 0:  # Get efficiency of un-initalized model
+                aiq_dict, aiq_time = calc_AiQ(model)
+                epoch_eff = aiq_dict['net_efficiency']
+                iter_eff.append(aiq_dict)
+                model_estop.append(epoch_counter)
+                print('[epoch 0] Model Efficiency: %.7f' % epoch_eff)
+                for layer in aiq_dict["layer_metrics"]:
+                    print('[epoch 0]\t Layer %s Efficiency: %.7f' % (layer, aiq_dict['layer_metrics'][layer]['efficiency']))
+
             if options.lottery:  # If using lottery ticket method, reset all weights to first initalized vals
                 print("~~~~~!~!~!~!~!~!~Resetting Model!~!~!~!~!~!~~~~~\n\n")
                 print("Resetting Model to Inital State dict with masks applied. Verifying via param count.\n\n")
