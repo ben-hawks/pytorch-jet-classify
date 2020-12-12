@@ -34,11 +34,13 @@ spec:
           mountPath: /opt/repo
         resources:
           limits:
-            memory: 4Gi
+            memory: 8Gi
             cpu: "4"
+            nvidia.com/gpu: "1"
           requests:
             memory: 2Gi
             cpu: "1"
+            nvidia.com/gpu: "1"
       initContainers:
       - name: init-clone-repo
         image: alpine/git
