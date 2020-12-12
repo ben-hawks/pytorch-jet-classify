@@ -48,6 +48,7 @@ class ParticleJetDataset(Dataset):
             features_labels_df = pd.DataFrame(self.h5File["jets"][:], columns=columns_arr)
         else:
             print("Error! path specified is a special file (socket, FIFO, device file), or isn't valid")
+            print("Given Path: {}".format(data_path))
 
         features_labels_df = features_labels_df.drop_duplicates()
         features_df = features_labels_df[features]
