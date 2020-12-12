@@ -237,6 +237,8 @@ if __name__ == '__main__':
     print("Using Device: {}".format(device))
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.fastest = True
+    if use_cuda:
+        print("cuda:0 device type: {}".format(torch.cuda.get_device_name(0)))
 
     # Set Batch size and split value
     batch_size = 1024
