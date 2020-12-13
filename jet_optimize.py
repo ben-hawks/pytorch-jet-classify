@@ -149,8 +149,8 @@ def run_train(model,train_loader,val_loader):
                                                                    options.bits,
                                                                    model.dims[0], model.dims[1],model.dims[2],
                                                                    time)
-    print("Val Losses: {}".format(valid_losses))
-    print("Train Losses: {}".format(train_losses_epoch))
+    #print("Val Losses: {}".format(valid_losses))
+    #print("Train Losses: {}".format(train_losses_epoch))
 
     loss_ax.plot(range(1, len(train_losses_epoch) + 1), train_losses_epoch, label='Training Loss')
     loss_ax.plot(range(1, len(valid_losses) + 1), valid_losses, label='Validation Loss')
@@ -202,7 +202,7 @@ def test(model, test_loader, L1_factor=0.0001):
 
     # add test loss to our loss dict to make plotting stuff easier, we calc other perf metrics later
     model_loss_dict['{}-{}-{}'.format(model.dims[0], model.dims[1],model.dims[2])].append(loss.tolist())
-    print(loss)
+    print("Loss on test set for model: {}".format(loss))
     return loss #accuracy
 
 def create_train_eval(parameterization):
@@ -212,9 +212,9 @@ def create_train_eval(parameterization):
 
     eval_loss = test(trained_model,test_loader)
 
-    print(eval_loss)
+    print("eval return dtype: {}".format(type(eval_loss)))
 
-    return eval_loss
+    return float(eval_loss)
 
 
 if __name__ == '__main__':
