@@ -152,9 +152,10 @@ def gen_bo_model_dict(dir):
                 size = ast.literal_eval(sizestr)
                 dims = size
                 prune_masks = {
-                "fc1": torch.ones(dims[0], 16),
-                "fc2": torch.ones(dims[1], dims[0]),
-                "fc3": torch.ones(dims[2], dims[1])}
+                    "fc1": torch.ones(dims[0], 16),
+                    "fc2": torch.ones(dims[1], dims[0]),
+                    "fc3": torch.ones(dims[2], dims[1]),
+                    "fc4": torch.ones(5, dims[2])}
                 bomodel = models.three_layer_model_bv_tunable(prune_masks,size) #Shouldnt have to worry about correct precision for simple param count (for now)
                 bomodel.load_state_dict(torch.load(os.path.join(dir, file), map_location=device))
                 count, total_param, _, _ = countNonZeroWeights(bomodel)
