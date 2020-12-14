@@ -14,7 +14,7 @@ spec:
         command:
         - "python"
         args:
-        - /opt/repo/pytorch-jet-classify/post_training_metrics.py
+        - /opt/repo/pytorch-jet-classify/bo_post_training_metrics.py
         - -t
         - /ptjetclassvol/train_data/test/
         - -i
