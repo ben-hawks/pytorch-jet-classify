@@ -488,8 +488,9 @@ for model_bops, model_file in sorted(float_model_set.items()):
         "fc3": torch.ones(dims[2], dims[1]),
         "fc4": torch.ones(5, dims[2])}
     print('Calculating AiQ for BO 32b, ' + str(model_bops) + ' BOPS, size ' + str(size))
-    float_AiQ.update({model_bops: calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,32),
-                                               os.path.join(dir, '32b', model_file)).update({'dims':dims})})
+    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,32), os.path.join(dir, '32b', model_file))
+    results.update = {'dims': dims}
+    float_AiQ.update({model_bops: results})
 
 quant_12b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_12b.items()):
@@ -502,8 +503,9 @@ for model_bops, model_file in sorted(quant_model_set_12b.items()):
         "fc3": torch.ones(dims[2], dims[1]),
         "fc4": torch.ones(5, dims[2])}
     print('Calculating AiQ for BO 12b, ' + str(model_bops) + ' BOPS, size ' + str(size))
-    quant_12b_AiQ.update({model_bops: calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,12),
-                                               os.path.join(dir, '12b', model_file)).update({'dims':dims})})
+    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,12), os.path.join(dir, '12b', model_file))
+    results.update = {'dims': dims}
+    quant_12b_AiQ.update({model_bops: results})
 
 
 quant_4b_AiQ = {}
@@ -517,8 +519,9 @@ for model_bops, model_file in sorted(quant_model_set_4b.items()):
         "fc3": torch.ones(dims[2], dims[1]),
         "fc4": torch.ones(5, dims[2])}
     print('Calculating AiQ for BO 4b, ' + str(model_bops) + ' BOPS, size ' + str(size))
-    quant_4b_AiQ.update({model_bops: calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,4),
-                                               os.path.join(dir, '4b', model_file)).update({'dims':dims})})
+    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,4), os.path.join(dir, '4b', model_file))
+    results.update= {'dims': dims}
+    quant_4b_AiQ.update({model_bops: results})
 
 quant_6b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_6b.items()):
@@ -531,8 +534,9 @@ for model_bops, model_file in sorted(quant_model_set_6b.items()):
         "fc3": torch.ones(dims[2], dims[1]),
         "fc4": torch.ones(5, dims[2])}
     print('Calculating AiQ for BO 6b, ' + str(model_bops) + ' BOPS, size ' + str(size))
-    quant_6b_AiQ.update({model_bops: calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,6),
-                                               os.path.join(dir, '6b', model_file)).update({'dims':dims})})
+    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,6), os.path.join(dir, '6b', model_file))
+    results.update={'dims':dims}
+    quant_6b_AiQ.update({model_bops: results})
 
 import json
 dump_dict={ '32b':float_AiQ,
@@ -552,12 +556,12 @@ aiq_ax.grid(True)
 aiq_ax.set_xscale("log")
 aiq_ax.set_xlabel('Binary Operations (BOPS)')
 aiq_ax.set_ylabel('AUC ROC Score')
-for precision, results in dump_dict:
+for precision, results in dump_dict.items():
     aiq_ax.scatter([key for key in results], [z['auc_roc'] for z in results.values()], label=precision)
     for key in float_AiQ: aiq_ax.annotate([z['dims'] for z in results.values()],
                                           ([key for key in results], [z['auc_roc'] for z in results.values()]))
 aiq_ax.legend(loc='best')
-aiq_plot.savefig(os.path.join(options.outputDir, 'auc_roc_BOPS.png'))
+aiq_plot.savefig(os.path.join(options.outputDir, 'auc_roc_BOPS_BO.png'))
 aiq_plot.show()
 
 aiq_plot = plt.figure()
@@ -567,7 +571,7 @@ aiq_ax.grid(True)
 aiq_ax.set_xscale("log")
 aiq_ax.set_xlabel('Binary Operations (BOPS)')
 aiq_ax.set_ylabel('Accuracy Score')
-for precision, results in dump_dict:
+for precision, results in dump_dict.items():
     aiq_ax.scatter([key for key in results], [z['accuracy'] for z in results.values()], label=precision)
     for key in float_AiQ: aiq_ax.annotate([z['dims'] for z in results.values()],
                                           ([key for key in results], [z['accuracy'] for z in results.values()]))
@@ -582,12 +586,12 @@ aiq_ax.grid(True)
 aiq_ax.set_xscale("log")
 aiq_ax.set_xlabel('Binary Operations (BOPS)')
 aiq_ax.set_ylabel('Efficiency')
-for precision, results in dump_dict:
+for precision, results in dump_dict.items():
     aiq_ax.scatter([key for key in results], [z['net_efficiency'] for z in results.values()], label=precision)
     for key in float_AiQ: aiq_ax.annotate([z['dims'] for z in results.values()],
                                           ([key for key in results], [z['net_efficiency'] for z in results.values()]))
 aiq_ax.legend(loc='best')
-aiq_plot.savefig(os.path.join(options.outputDir, 'auc_roc_BOPS.png'))
+aiq_plot.savefig(os.path.join(options.outputDir, 'auc_roc_BOPS_BO.png'))
 aiq_plot.show()
 
 
