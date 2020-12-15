@@ -489,7 +489,7 @@ for model_bops, model_file in sorted(float_model_set.items()):
         "fc4": torch.ones(5, dims[2])}
     print('Calculating AiQ for BO 32b, ' + str(model_bops) + ' BOPS, size ' + str(size))
     results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,32), os.path.join(dir, '32b', model_file))
-    results.update = {'dims': dims}
+    results.update({'dims': dims})
     float_AiQ.update({model_bops: results})
 
 quant_12b_AiQ = {}
@@ -504,7 +504,7 @@ for model_bops, model_file in sorted(quant_model_set_12b.items()):
         "fc4": torch.ones(5, dims[2])}
     print('Calculating AiQ for BO 12b, ' + str(model_bops) + ' BOPS, size ' + str(size))
     results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,12), os.path.join(dir, '12b', model_file))
-    results.update = {'dims': dims}
+    results.update({'dims': dims})
     quant_12b_AiQ.update({model_bops: results})
 
 
@@ -520,7 +520,7 @@ for model_bops, model_file in sorted(quant_model_set_4b.items()):
         "fc4": torch.ones(5, dims[2])}
     print('Calculating AiQ for BO 4b, ' + str(model_bops) + ' BOPS, size ' + str(size))
     results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,4), os.path.join(dir, '4b', model_file))
-    results.update= {'dims': dims}
+    results.update({'dims': dims})
     quant_4b_AiQ.update({model_bops: results})
 
 quant_6b_AiQ = {}
@@ -535,7 +535,7 @@ for model_bops, model_file in sorted(quant_model_set_6b.items()):
         "fc4": torch.ones(5, dims[2])}
     print('Calculating AiQ for BO 6b, ' + str(model_bops) + ' BOPS, size ' + str(size))
     results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,6), os.path.join(dir, '6b', model_file))
-    results.update={'dims':dims}
+    results.update({'dims': dims})
     quant_6b_AiQ.update({model_bops: results})
 
 import json
