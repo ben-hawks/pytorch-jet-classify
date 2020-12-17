@@ -10,8 +10,8 @@ import torch.optim as optim
 import torch.nn.utils.prune as prune
 import yaml
 import math
-from tools import plot_weights
-from tools.pytorchtools import EarlyStopping
+from training import training_plots
+from training.early_stopping import EarlyStopping
 from datetime import datetime
 import os.path as path
 import os
@@ -423,9 +423,9 @@ if __name__ == "__main__":
                 base_MSE_average = np.average(MSE_values)
                 print('[Base Model] Base MSE (avg): %.7f' % (base_MSE_average))
                 filename = path.join(options.outputDir, 'AE_weight_dist_{}b_Base.png'.format(nbits, epoch_counter))
-                plot_weights.plot_kernels(model,
-                                          text=' (Unpruned FP Model)',
-                                          output=filename)
+                training_plots.plot_kernels(model,
+                                            text=' (Unpruned FP Model)',
+                                            output=filename)
                 model_filename = path.join(options.outputDir, "AE_{}b_unpruned_{}.pth".format(nbits, time))
                 torch.save(model.state_dict(),model_filename)
                 first_run = False
@@ -438,9 +438,9 @@ if __name__ == "__main__":
                 base_quant_MSE_average = np.average(MSE_values)
                 print('[Base Quant Model] Base MSE (avg): %.7f' % (base_quant_MSE_average))
                 filename = path.join(options.outputDir, 'AE_weight_dist_{}b_qBase.png'.format(nbits, epoch_counter))
-                plot_weights.plot_kernels(model,
-                                          text=' (Unpruned Quant Model)',
-                                          output=filename)
+                training_plots.plot_kernels(model,
+                                            text=' (Unpruned Quant Model)',
+                                            output=filename)
                 model_filename = path.join(options.outputDir, "AE_{}b_unpruned_{}.pth".format(nbits, time))
                 torch.save(model.state_dict(),model_filename)
                 first_quant = False
@@ -462,10 +462,10 @@ if __name__ == "__main__":
                 filename = path.join(options.outputDir, 'AE_weight_dist_{}b_e{}_{}.png'.format(nbits, epoch_counter, time))
                 print("Post Pruning: ")
                 pruned_params = countNonZeroWeights(model)
-                plot_weights.plot_kernels(model,
-                                          text=' (Pruned ' + str(base_params - pruned_params) + ' out of ' + str(
+                training_plots.plot_kernels(model,
+                                            text=' (Pruned ' + str(base_params - pruned_params) + ' out of ' + str(
                                               base_params) + ' params)',
-                                          output=filename)
+                                            output=filename)
 
         if not first_quant and base_quant_accuracy_score is None:
             first_quant = True

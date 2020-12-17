@@ -1,68 +1,31 @@
-import torch.nn as nn
-import torch
-import numpy as np
-import models
-import jet_dataset
-from optparse import OptionParser
-from sklearn.metrics import accuracy_score, average_precision_score, roc_auc_score
-from iter_prune import l1_regularizer, parse_config
-import torch.optim as optim
-import math
-from tools.pytorchtools import EarlyStopping
-from datetime import datetime
+# Import misc packages
 import os
 import os.path as path
-import ax
-import matplotlib.pyplot as plt
 import json
+import math
+import numpy as np
+from datetime import datetime
+import matplotlib.pyplot as plt
+from optparse import OptionParser
+
+# Import Torch
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+# Import AX Platform
+import ax
 #from ax.utils.notebook.plotting import render
 from ax.utils.tutorials.cnn_utils import train
 
+# Import our code
+import models
+import jet_dataset
+from tools.parse_yaml_config import parse_config
+from training.train_funcs import train, val
+from training.early_stopping import EarlyStopping
+
 tested_sizes = []
-
-
-def train(model, optimizer, loss, train_loader, L1_factor=0.0001):
-    train_losses = []
-    model.to(device)
-    model.mask_to_device(device)
-    for i, data in enumerate(train_loader, 0):
-        local_batch, local_labels = data
-        model.train()
-        local_batch, local_labels = local_batch.to(device), local_labels.to(device)
-        # forward + backward + optimize
-        optimizer.zero_grad()
-        outputs = model(local_batch.float())
-        criterion_loss = loss(outputs, local_labels.float())
-        reg_loss = l1_regularizer(model, lambda_l1=L1_factor)
-        total_loss = criterion_loss + reg_loss
-        total_loss.backward()
-        optimizer.step()
-        step_loss = total_loss.item()
-        train_losses.append(step_loss)
-    return model, train_losses
-
-
-def val(model, loss, val_loader, L1_factor=0.0001):
-    val_roc_auc_scores_list = []
-    val_avg_precision_list = []
-    val_losses = []
-    model.to(device)
-    model.mask_to_device(device)
-    with torch.set_grad_enabled(False):
-        model.eval()
-        for i, data in enumerate(val_loader, 0):
-            local_batch, local_labels = data
-            local_batch, local_labels = local_batch.to(device), local_labels.to(device)
-            outputs = model(local_batch.float())
-            criterion_loss = loss(outputs, local_labels.float())
-            reg_loss = l1_regularizer(model, lambda_l1=L1_factor)
-            val_loss = criterion_loss + reg_loss
-            local_batch, local_labels = local_batch.cpu(), local_labels.cpu()
-            outputs = outputs.cpu()
-            val_roc_auc_scores_list.append(roc_auc_score(local_labels.numpy(), outputs.numpy()))
-            val_avg_precision_list.append(average_precision_score(local_labels.numpy(), outputs.numpy()))
-            val_losses.append(val_loss)
-    return val_losses, val_avg_precision_list, val_roc_auc_scores_list
 
 
 def create_model(parameterization):
@@ -93,11 +56,12 @@ def run_train(model,train_loader,val_loader):
 
     for epoch in range(options.epochs):  # loop over the dataset multiple times
         # Train
-        model, train_losses = train(model, optimizer, criterion, train_loader, L1_factor=L1_factor)
+        model, train_losses = train(model, optimizer, criterion, train_loader,
+                                    L1_factor=L1_factor, device=device, l1reg=True)
 
         # Validate
         val_losses, val_avg_precision_list, val_roc_auc_scores_list = val(model, criterion, val_loader,
-                                                                          L1_factor=L1_factor)
+                                                                          L1_factor=L1_factor, device=device)
 
         # Calculate average epoch statistics
         try:

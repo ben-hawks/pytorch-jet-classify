@@ -1,281 +1,28 @@
-import torch.nn as nn
-import torch
-import numpy as np
-import pandas as pd
-import models
-import jet_dataset
-import matplotlib.pyplot as plt
-from optparse import OptionParser
-from sklearn.metrics import accuracy_score, roc_curve, confusion_matrix, average_precision_score, auc, roc_auc_score
-import torch.optim as optim
-import torch.nn.utils.prune as prune
-import yaml
+# Import misc packages
 import math
-import seaborn as sn
-from tools import plot_weights, TensorEfficiency
-from tools.pytorchtools import EarlyStopping
 import json
-from datetime import datetime
 import os
 import os.path as path
-import brevitas.nn as qnn
-import time as time_lib
+import numpy as np
+from datetime import datetime
+import matplotlib.pyplot as plt
+from optparse import OptionParser
 
-def parse_config(config_file) :
-    print("Loading configuration from", config_file)
-    config = open(config_file, 'r')
-    return yaml.load(config, Loader=yaml.FullLoader)
+# Import torch stuff
+import torch
+import torch.optim as optim
+import torch.nn as nn
+import torch.nn.utils.prune as prune
 
-class SaveOutput:
-    def __init__(self):
-        self.outputs = []
-
-    def __call__(self, module, module_in, module_out):
-        self.outputs.append(module_out)
-
-    def clear(self):
-        self.outputs = []
-
-def countNonZeroWeights(model):
-    nonzero = total = 0
-    for name, p in model.named_parameters():
-        tensor = p.data.cpu().numpy()
-        nz_count = np.count_nonzero(tensor)
-        total_params = np.prod(tensor.shape)
-        nonzero += nz_count
-        total += total_params
-        print(f'{name:20} | nonzeros = {nz_count:7} / {total_params:7} ({100 * nz_count / total_params:6.2f}%) | total_pruned = {total_params - nz_count :7} | shape = {tensor.shape}')
-    print(f'alive: {nonzero}, pruned : {total - nonzero}, total: {total}, Compression rate : {total/nonzero:10.2f}x  ({100 * (total-nonzero) / total:6.2f}% pruned)')
-    return nonzero
-
-
-def l1_regularizer(model, lambda_l1=0.01):
-    #  after hours of searching, this man is a god: https://stackoverflow.com/questions/58172188/
-    lossl1 = 0
-    for model_param_name, model_param_value in model.named_parameters():
-        if model_param_name.endswith('weight'):
-            lossl1 += lambda_l1 * model_param_value.abs().sum()
-    return lossl1
-
-def calc_AiQ(aiq_model):
-    """ Calculate efficiency of network using TensorEfficiency """
-    # Time the execution
-    start_time = time_lib.time()
-    aiq_model.cpu()
-    aiq_model.mask_to_device('cpu')
-    aiq_model.eval()
-    hooklist = []
-    # Set up the data
-    ensemble = {}
-
-    # Initialize arrays for storing microstates
-    if options.batnorm:
-        microstates = {name: np.ndarray([]) for name, module in aiq_model.named_modules() if
-                       ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
-                       or (isinstance(module, torch.nn.BatchNorm1d))}
-        microstates_count = {name: 0 for name, module in aiq_model.named_modules() if
-                             ((isinstance(module, torch.nn.Linear) or isinstance(module,qnn.QuantLinear)) and name == 'fc4') \
-                             or (isinstance(module, torch.nn.BatchNorm1d))}
-    else:
-        microstates = {name: np.ndarray([]) for name, module in model.named_modules() if
-                       isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)}
-        microstates_count = {name: 0 for name, module in model.named_modules() if
-                             isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)}
-
-    activation_outputs = SaveOutput()  # Our forward hook class, stores the outputs of each layer it's registered to
-
-    # register a forward hook to get and store the activation at each Linear layer while running
-    layer_list = []
-    for name, module in aiq_model.named_modules():
-        if options.batnorm:
-            if ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
-              or (isinstance(module, torch.nn.BatchNorm1d)):  # Record @ BN output except last layer (since last has no BN)
-                hooklist.append(module.register_forward_hook(activation_outputs))
-                layer_list.append(name)  # Probably a better way to do this, but it works,
-        else:
-            if (isinstance(module, torch.nn.Linear) or isinstance(module,qnn.QuantLinear)):  # We only care about linear layers except the last
-                hooklist.append(module.register_forward_hook(activation_outputs))
-                layer_list.append(name)  # Probably a better way to do this, but it works,
-    # Process data using torch dataloader, in this case we
-    for i, data in enumerate(test_loader, 0):
-        activation_outputs.clear()
-        local_batch, local_labels = data
-
-        # Run through our test batch and get inference results
-        with torch.no_grad():
-            local_batch, local_labels = local_batch.to('cpu'), local_labels.to('cpu')
-            outputs = aiq_model(local_batch.float())
-
-            # Calculate microstates for this run
-            for name, x in zip(layer_list, activation_outputs.outputs):
-                # print("---- AIQ Calc ----")
-                # print("Act list: " + name + str(x))
-                x = x.numpy()
-                # Initialize the layer in the ensemble if it doesn't exist
-                if name not in ensemble.keys():
-                    ensemble[name] = {}
-
-                # Initialize an array for holding layer states if it has not already been initialized
-                sort_count_freq = 1  # How often (iterations) we sort/count states
-                if microstates[name].size == 1:
-                    microstates[name] = np.ndarray((sort_count_freq * np.prod(x.shape[0:-1]), x.shape[-1]), dtype=bool,
-                                                   order='F')
-
-                # Store the layer states
-                new_count = microstates_count[name] + np.prod(x.shape[0:-1])
-                microstates[name][
-                microstates_count[name]:microstates_count[name] + np.prod(x.shape[0:-1]), :] = np.reshape(x > 0,(-1, x.shape[-1]), order='F')
-                # Only sort/count states every 5 iterations
-                if new_count < microstates[name].shape[0]:
-                    microstates_count[name] = new_count
-                    continue
-                else:
-                    microstates_count[name] = 0
-
-                # TensorEfficiency.sort_microstates aggregates microstates by sorting
-                sorted_states, index = TensorEfficiency.sort_microstates(microstates[name], True)
-
-                # TensorEfficiency.accumulate_ensemble stores the the identity of each observed
-                # microstate and the number of times that microstate occurred
-                TensorEfficiency.accumulate_ensemble(ensemble[name], sorted_states, index)
-            # If the current layer is the final layer, record the class prediction
-            # if isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear):
-
-        # Calculate efficiency and entropy of each layer
-        layer_metrics = {}
-        metrics = ['efficiency', 'entropy', 'max_entropy']
-        for layer, states in ensemble.items():
-            layer_metrics[layer] = {key: value for key, value in
-                                    zip(metrics, TensorEfficiency.layer_efficiency(states))}
-        for hook in hooklist:
-            hook.remove() #remove our output recording hooks from the network
-
-        # Calculate network efficiency and aIQ, with beta=2
-        net_efficiency = TensorEfficiency.network_efficiency([m['efficiency'] for m in layer_metrics.values()])
-        #print('AiQ Calc Execution time: {}'.format(time_lib.time() - start_time))
-        # Return AiQ along with our metrics
-        aiq_model.to(device)
-        aiq_model.mask_to_device(device)
-        return {'net_efficiency': net_efficiency, 'layer_metrics': layer_metrics}, (time_lib.time() - start_time)
-
-
-
-def train(model, optimizer, loss, train_loader, L1_factor=0.0001):
-    train_losses = []
-    model.to(device)
-    model.mask_to_device(device)
-    for i, data in enumerate(train_loader, 0):
-        local_batch, local_labels = data
-        model.train()
-        local_batch, local_labels = local_batch.to(device), local_labels.to(device)
-        # forward + backward + optimize
-        optimizer.zero_grad()
-        outputs = model(local_batch.float())
-        criterion_loss = loss(outputs, local_labels.float())
-        if options.l1reg:
-            reg_loss = l1_regularizer(model, lambda_l1=L1_factor)
-        else:
-            reg_loss = 0
-        total_loss = criterion_loss + reg_loss
-        total_loss.backward()
-        optimizer.step()
-        step_loss = total_loss.item()
-        train_losses.append(step_loss)
-    return model, train_losses
-
-
-def val(model, loss, val_loader, L1_factor=0.01):
-    val_roc_auc_scores_list = []
-    val_avg_precision_list = []
-    val_losses = []
-    model.to(device)
-    with torch.set_grad_enabled(False):
-        model.eval()
-        for i, data in enumerate(val_loader, 0):
-            local_batch, local_labels = data
-            local_batch, local_labels = local_batch.to(device), local_labels.to(device)
-            outputs = model(local_batch.float())
-            criterion_loss = loss(outputs, local_labels.float())
-            reg_loss = l1_regularizer(model, lambda_l1=L1_factor)
-            val_loss = criterion_loss + reg_loss
-            local_batch, local_labels = local_batch.cpu(), local_labels.cpu()
-            outputs = outputs.cpu()
-            val_roc_auc_scores_list.append(roc_auc_score(np.nan_to_num(local_labels.numpy()), np.nan_to_num(outputs.numpy())))
-            val_avg_precision_list.append(average_precision_score(np.nan_to_num(local_labels.numpy()), np.nan_to_num(outputs.numpy())))
-            val_losses.append(val_loss)
-    return val_losses, val_avg_precision_list, val_roc_auc_scores_list
-
-
-def test(model, test_loader, plot=True, pruned_params=0, base_params=0):
-    #device = torch.device('cpu') #required if doing a untrained init check
-    predlist = torch.zeros(0, dtype=torch.long, device='cpu')
-    lbllist = torch.zeros(0, dtype=torch.long, device='cpu')
-    accuracy_score_value_list = []
-    roc_auc_score_list = []
-    model.to(device)
-    with torch.no_grad():  # Evaulate pruned model performance
-        for i, data in enumerate(test_loader):
-            model.eval()
-            local_batch, local_labels = data
-            local_batch, local_labels = local_batch.to(device), local_labels.to(device)
-            outputs = model(local_batch.float())
-            _, preds = torch.max(outputs, 1)
-            predlist = torch.cat([predlist, preds.view(-1).cpu()])
-            lbllist = torch.cat([lbllist, torch.max(local_labels, 1)[1].view(-1).cpu()])
-        outputs = outputs.cpu()
-        local_labels = local_labels.cpu()
-        predict_test = outputs.numpy()
-        accuracy_score_value_list.append(accuracy_score(np.nan_to_num(lbllist.numpy()), np.nan_to_num(predlist.numpy())))
-        roc_auc_score_list.append(roc_auc_score(np.nan_to_num(local_labels.numpy()), np.nan_to_num(outputs.numpy())))
-
-        if plot:
-            predict_test = outputs.numpy()
-            df = pd.DataFrame()
-            fpr = {}
-            tpr = {}
-            auc1 = {}
-
-            #Time for filenames
-            now = datetime.now()
-            time = now.strftime("%d-%m-%Y_%H-%M-%S")
-
-            # AUC/Signal Efficiency
-            filename = 'ROC_{}b_{}_pruned_{}.png'.format(nbits,pruned_params,time)
-
-            sig_eff_plt = plt.figure()
-            sig_eff_ax = sig_eff_plt.add_subplot()
-            for i, label in enumerate(test_dataset.labels_list):
-                df[label] = local_labels[:, i]
-                df[label + '_pred'] = predict_test[:, i]
-                fpr[label], tpr[label], threshold = roc_curve(np.nan_to_num(df[label]), np.nan_to_num(df[label + '_pred']))
-                auc1[label] = auc(np.nan_to_num(fpr[label]), np.nan_to_num(tpr[label]))
-                plt.plot(np.nan_to_num(tpr[label]), np.nan_to_num(fpr[label]),
-                         label='%s tagger, AUC = %.1f%%' % (label.replace('j_', ''), np.nan_to_num(auc1[label]) * 100.))
-            sig_eff_ax.set_yscale('log')
-            sig_eff_ax.set_xlabel("Signal Efficiency")
-            sig_eff_ax.set_ylabel("Background Efficiency")
-            sig_eff_ax.set_ylim(0.001, 1)
-            sig_eff_ax.grid(True)
-            sig_eff_ax.legend(loc='upper left')
-            sig_eff_ax.text(0.25, 0.90, '(Pruned {} of {}, {}b)'.format(pruned_params,base_params,nbits),
-                        fontweight='bold',
-                        wrap=True, horizontalalignment='right', fontsize=12)
-            sig_eff_plt.savefig(path.join(options.outputDir, filename))
-            sig_eff_plt.show()
-            plt.close(sig_eff_plt)
-
-            # Confusion matrix
-            filename = 'confMatrix_{}b_{}_pruned_{}.png'.format(nbits,pruned_params,time)
-            conf_mat = confusion_matrix(np.nan_to_num(lbllist.numpy()), np.nan_to_num(predlist.numpy()))
-            df_cm = pd.DataFrame(conf_mat, index=[i for i in test_dataset.labels_list],
-                                 columns=[i for i in test_dataset.labels_list])
-            plt.figure(figsize=(10, 7))
-            sn.heatmap(df_cm, annot=True, fmt='g')
-            plt.savefig(path.join(options.outputDir, filename))
-            plt.show()
-            plt.close()
-    return accuracy_score_value_list, roc_auc_score_list
-
+# Import our own code
+import models
+import jet_dataset
+from training.early_stopping import EarlyStopping
+from training.train_funcs import train, val, test_pruned as test
+from tools.aiq import calc_AiQ 
+from training.training_plots import plot_total_loss, plot_total_eff, plot_metric_vs_bitparam, plot_kernels
+from tools.param_count import countNonZeroWeights
+from tools.parse_yaml_config import parse_config
 
 def prune_model(model, amount, prune_mask, method=prune.L1Unstructured):
     model.to('cpu')
@@ -307,85 +54,6 @@ def prune_model(model, amount, prune_mask, method=prune.L1Unstructured):
     return model
 
 
-def plot_metric_vs_bitparam(model_set,metric_results_set,bit_params_set,base_metrics_set,metric_text):
-    # NOTE: Assumes that the first object in the base metrics set is the true base of comparison
-    now = datetime.now()
-    time = now.strftime("%d-%m-%Y_%H-%M-%S")
-
-    filename = '{}_vs_bitparams'.format(metric_text) + str(time) + '.png'
-
-    rel_perf_plt = plt.figure()
-    rel_perf_ax = rel_perf_plt.add_subplot()
-
-    for model, metric_results, bit_params in zip(model_set, metric_results_set, bit_params_set):
-        nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
-        rel_perf_ax.plot(bit_params, metric_results, linestyle='solid', marker='.', alpha=1, label='Pruned {}b'.format(nbits))
-
-    #Plot "base"/unpruned model points
-    for model, base_metric in zip(model_set,base_metrics_set):
-        # base_metric = [[num_params],[base_metric]]
-        nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
-        rel_perf_ax.plot((base_metric[0] * nbits), 1/(base_metric[1]/base_metrics_set[0][1]), linestyle='solid', marker="X", alpha=1, label='Unpruned {}b'.format(nbits))
-
-    rel_perf_ax.set_ylabel("1/{}/FP{}".format(metric_text,metric_text))
-    rel_perf_ax.set_xlabel("Bit Params (Params * bits)")
-    rel_perf_ax.grid(color='lightgray', linestyle='-', linewidth=1, alpha=0.3)
-    rel_perf_ax.legend(loc='best')
-    rel_perf_plt.savefig(path.join(options.outputDir, filename))
-    rel_perf_plt.show()
-    plt.close(rel_perf_plt)
-
-
-def plot_total_loss(model_set, model_totalloss_set, model_estop_set):
-    # Total loss over fine tuning
-    now = datetime.now()
-    time = now.strftime("%d-%m-%Y_%H-%M-%S")
-    for model, model_loss, model_estop in zip(model_set, model_totalloss_set, model_estop_set):
-        tloss_plt = plt.figure()
-        tloss_ax = tloss_plt.add_subplot()
-        nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
-        filename = 'total_loss_{}b_{}.png'.format(nbits,time)
-        tloss_ax.plot(range(1, len(model_loss[0]) + 1), model_loss[0], label='Training Loss')
-        tloss_ax.plot(range(1, len(model_loss[1]) + 1), model_loss[1], label='Validation Loss')
-        # plot each stopping point
-        for stop in model_estop:
-            tloss_ax.axvline(stop, linestyle='--', color='r', alpha=0.3)
-        tloss_ax.set_xlabel('epochs')
-        tloss_ax.set_ylabel('loss')
-        tloss_ax.grid(True)
-        tloss_ax.legend(loc='best')
-        tloss_ax.set_title('Total Loss Across pruning & fine tuning {}b model'.format(nbits))
-        tloss_plt.tight_layout()
-        tloss_plt.savefig(path.join(options.outputDir,filename))
-        tloss_plt.show()
-        plt.close(tloss_plt)
-
-def plot_total_eff(model_set, model_eff_set, model_estop_set):
-    # Total loss over fine tuning
-    now = datetime.now()
-    time = now.strftime("%d-%m-%Y_%H-%M-%S")
-    for model, model_eff_iter, model_estop in zip(model_set, model_eff_set, model_estop_set):
-        tloss_plt = plt.figure()
-        tloss_ax = tloss_plt.add_subplot()
-        nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
-        filename = 'total_eff_{}b_{}.png'.format(nbits,time)
-        tloss_ax.plot(range(1, len(model_eff_iter) + 1), [z['net_efficiency'] for z in model_eff_iter], label='Net Efficiency',
-                     color='green')
-
-        # plot each stopping point
-        for stop in model_estop:
-            tloss_ax.axvline(stop, linestyle='--', color='r', alpha=0.3)
-        tloss_ax.set_xlabel('epochs')
-        tloss_ax.set_ylabel('Net Efficiency')
-        tloss_ax.grid(True)
-        tloss_ax.legend(loc='best')
-        tloss_ax.set_title('Total Net. Eff. Across pruning & fine tuning {}b model'.format(nbits))
-        tloss_plt.tight_layout()
-        tloss_plt.savefig(path.join(options.outputDir,filename))
-        tloss_plt.show()
-        plt.close(tloss_plt)
-
-
 if __name__ == "__main__":
     parser = OptionParser()
     parser.add_option('-i','--input'   ,action='store',type='string',dest='inputFile'   ,default='', help='location of data to train off of')
@@ -404,59 +72,33 @@ if __name__ == "__main__":
     parser.add_option('-n', '--net_efficiency', action='store_true', dest='efficiency_calc', default=False, help='Enable Per-Epoch efficiency calculation (adds train time)')
     (options,args) = parser.parse_args()
     yamlConfig = parse_config(options.config)
-    #3938
-    prune_value_set = [0.10, 0.111, .125, .143, .166, .20, .25, .333, .50, .666, .666,#take ~10% of the "original" value each time, reducing to ~15% original network size
-                       0]  # Last 0 is so the final iteration can fine tune before testing
 
-    if not path.exists(options.outputDir): #create given output directory if it doesnt exist
+    # create given output directory if it doesnt exist
+    if not path.exists(options.outputDir):
         os.makedirs(options.outputDir, exist_ok=True)
 
-    prune_mask_set = [
-        {  # Float Model
-            "fc1": torch.ones(64, 16),
-            "fc2": torch.ones(32, 64),
-            "fc3": torch.ones(32, 32),
-            "fc4": torch.ones(5, 32)},
-        {  # Quant Model
-            "fc1": torch.ones(64, 16),
-            "fc2": torch.ones(32, 64),
-            "fc3": torch.ones(32, 32),
-            "fc4": torch.ones(5, 32)},
-        {  # Quant Model
-            "fc1": torch.ones(64, 16),
-            "fc2": torch.ones(32, 64),
-            "fc3": torch.ones(32, 32),
-            "fc4": torch.ones(5, 32)},
-        {  # Quant Model
-            "fc1": torch.ones(64, 16),
-            "fc2": torch.ones(32, 64),
-            "fc3": torch.ones(32, 32),
-            "fc4": torch.ones(5, 32)},
-        {  # Quant Model
-            "fc1": torch.ones(64, 16),
-            "fc2": torch.ones(32, 64),
-            "fc3": torch.ones(32, 32),
-            "fc4": torch.ones(5, 32)},
-    ]
+    # take ~10% of the "original" value each time, until last few iterations, reducing to ~1.2% original network size
+    prune_value_set = [0.10, 0.111, .125, .143, .166, .20, .25, .333, .50, .666, .666]
+    prune_value_set.append(0)  # Last 0 is so the final iteration can fine tune before testing
 
-    scaled_prune_mask_set = [
-        {  # 1/4 Quant Model
-            "fc1": torch.ones(16, 16),
-            "fc2": torch.ones(8, 16),
-            "fc3": torch.ones(8, 8)},
-        {  # 4x Quant Model
-            "fc1": torch.ones(256, 16),
-            "fc2": torch.ones(128, 256),
-            "fc3": torch.ones(128, 128)}
-    ]
+    standard_mask = {
+            "fc1": torch.ones(64, 16),
+            "fc2": torch.ones(32, 64),
+            "fc3": torch.ones(32, 32),
+            "fc4": torch.ones(5, 32)}
 
-    # First model should be the "Base" model that all other accuracies are compared to!
+    prune_mask_set = [standard_mask for m in range(0, 5)]
 
+    print("Made {} Masks!".format(len(prune_mask_set)))
+
+    #If we're Lottery Ticket Hypothesis Pruning (LT/LTH), fix our seeds
     if options.lottery:
         # fix seed
         torch.manual_seed(yamlConfig["Seed"])
         torch.cuda.manual_seed_all(yamlConfig["Seed"]) #seeds all GPUs, just in case there's more than one
         np.random.seed(yamlConfig["Seed"])
+
+    # First model should be the "Base" model that all other accuracies are compared to!
     if options.batnorm:
         models = {'32': models.three_layer_model_batnorm_masked(prune_mask_set[0], bn_affine=options.bn_affine, bn_stats=options.bn_stats), #32b
                   '12': models.three_layer_model_bv_batnorm_masked(prune_mask_set[1],12, bn_affine=options.bn_affine, bn_stats=options.bn_stats), #12b
@@ -557,6 +199,7 @@ if __name__ == "__main__":
         pruned_params = 0
         nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
         last_stop = 0
+
         print("~!~!~!~!~!~!~!! Starting Train/Prune Cycle for {}b model! !!~!~!~!~!~!~!~".format(nbits))
         for prune_value in prune_value_set:
             # Epoch specific plot values
@@ -577,7 +220,7 @@ if __name__ == "__main__":
             estop = False
 
             if options.efficiency_calc and epoch_counter == 0:  # Get efficiency of un-initalized model
-                aiq_dict, aiq_time = calc_AiQ(model)
+                aiq_dict, aiq_time = calc_AiQ(model,test_loader,batnorm=options.batnorm,device=device)
                 epoch_eff = aiq_dict['net_efficiency']
                 iter_eff.append(aiq_dict)
                 model_estop.append(epoch_counter)
@@ -596,10 +239,10 @@ if __name__ == "__main__":
             for epoch in range(options.epochs):  # loop over the dataset multiple times
                 epoch_counter += 1
                 # Train
-                model, train_losses = train(model, optimizer, criterion, train_loader, L1_factor=L1_factor)
+                model, train_losses = train(model, optimizer, criterion, train_loader, L1_factor=L1_factor, l1reg=options.l1reg, device=device)
 
                 # Validate
-                val_losses, val_avg_precision_list, val_roc_auc_scores_list = val(model, criterion, val_loader, L1_factor=L1_factor)
+                val_losses, val_avg_precision_list, val_roc_auc_scores_list = val(model, criterion, val_loader, L1_factor=L1_factor, device=device)
 
                 # Calculate average epoch statistics
                 try:
@@ -616,7 +259,7 @@ if __name__ == "__main__":
                 val_avg_precision = np.average(val_avg_precision_list)
 
                 if options.efficiency_calc:
-                    aiq_dict, aiq_time = calc_AiQ(model)
+                    aiq_dict, aiq_time = calc_AiQ(model,test_loader,batnorm=options.batnorm,device=device)
                     epoch_eff = aiq_dict['net_efficiency']
                     iter_eff.append(aiq_dict)
 
@@ -712,12 +355,14 @@ if __name__ == "__main__":
             if first_run:
                 # Test base model, first iteration of the float model
                 print("Base Float Model:")
-                base_params = countNonZeroWeights(model)
-                accuracy_score_value_list, roc_auc_score_list = test(model, test_loader, pruned_params=0, base_params=base_params)
+                base_params,_,_,_ = countNonZeroWeights(model)
+                accuracy_score_value_list, roc_auc_score_list = test(model, test_loader, pruned_params=0,
+                                                                            base_params=base_params, nbits=nbits, 
+                                                                            outputDir=options.outputDir, device=device,test_dataset_labels=test_dataset.labels_list)
                 base_accuracy_score = np.average(accuracy_score_value_list)
                 base_roc_score = np.average(roc_auc_score_list)
                 filename = path.join(options.outputDir, 'weight_dist_{}b_Base_{}.png'.format(nbits, time))
-                plot_weights.plot_kernels(model, text=' (Unpruned FP Model)', output=filename)
+                plot_kernels(model, text=' (Unpruned FP Model)', output=filename)
                 if not path.exists(path.join(options.outputDir,'models','{}b'.format(nbits))):
                     os.makedirs(path.join(options.outputDir,'models','{}b'.format(nbits)))
                 model_filename = path.join(options.outputDir,'models','{}b'.format(nbits), "{}b_unpruned_{}.pth".format(nbits, time))
@@ -726,12 +371,14 @@ if __name__ == "__main__":
             elif first_quant:
                 # Test Unpruned, Base Quant model
                 print("Base Quant Model: ")
-                base_quant_params = countNonZeroWeights(model)
-                accuracy_score_value_list, roc_auc_score_list = test(model, test_loader, pruned_params=0, base_params=base_quant_params)
+                base_quant_params,_,_,_ = countNonZeroWeights(model)
+                accuracy_score_value_list, roc_auc_score_list = test(model, test_loader, pruned_params=0,
+                                                                            base_params=base_params, nbits=nbits, 
+                                                                            outputDir=options.outputDir, device=device,test_dataset_labels=test_dataset.labels_list)
                 base_quant_accuracy_score = np.average(accuracy_score_value_list)
                 base_quant_roc_score = np.average(roc_auc_score_list)
                 filename = path.join(options.outputDir, 'weight_dist_{}b_qBase_{}.png'.format(nbits, time))
-                plot_weights.plot_kernels(model, text=' (Unpruned Quant Model)', output=filename)
+                plot_kernels(model, text=' (Unpruned Quant Model)', output=filename)
                 if not path.exists(path.join(options.outputDir,'models','{}b'.format(nbits))):
                     os.makedirs(path.join(options.outputDir,'models','{}b'.format(nbits)))
                 model_filename = path.join(options.outputDir,'models','{}b'.format(nbits), "{}b_unpruned_{}.pth".format(nbits, time))
@@ -739,8 +386,10 @@ if __name__ == "__main__":
                 first_quant = False
             else:
                 print("Pre Pruning:")
-                current_params = countNonZeroWeights(model)
-                accuracy_score_value_list, roc_auc_score_list = test(model, test_loader, pruned_params=(base_params-current_params), base_params=base_params)
+                current_params,_,_,_ = countNonZeroWeights(model)
+                accuracy_score_value_list, roc_auc_score_list = test(model, test_loader, pruned_params=0,
+                                                                            base_params=base_params, nbits=nbits, 
+                                                                            outputDir=options.outputDir, device=device,test_dataset_labels=test_dataset.labels_list)
                 accuracy_score_value = np.average(accuracy_score_value_list)
                 roc_auc_score_value = np.average(roc_auc_score_list)
                 prune_results.append(1 / (accuracy_score_value / base_accuracy_score))
@@ -757,11 +406,11 @@ if __name__ == "__main__":
                 # Plot weight dist
                 filename = path.join(options.outputDir, 'weight_dist_{}b_e{}_{}.png'.format(nbits, epoch_counter, time))
                 print("Post Pruning: ")
-                pruned_params = countNonZeroWeights(model)
-                plot_weights.plot_kernels(model,
-                                          text=' (Pruned ' + str(base_params - pruned_params) + ' out of ' + str(
+                pruned_params,_,_,_ = countNonZeroWeights(model)
+                plot_kernels(model,
+                                            text=' (Pruned ' + str(base_params - pruned_params) + ' out of ' + str(
                                               base_params) + ' params)',
-                                          output=filename)
+                                            output=filename)
 
         if not first_quant and base_quant_accuracy_score is None:
             first_quant = True

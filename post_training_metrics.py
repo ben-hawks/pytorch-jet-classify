@@ -19,67 +19,19 @@ python pytorch_example.py
 
 """
 
-import os, time
+import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from tools import TensorEfficiency
 import torch
 import jet_dataset
 import models
-import yaml
-import pandas as pd
-from sklearn.metrics import accuracy_score, roc_curve, auc, roc_auc_score, mean_squared_error
+from sklearn.metrics import mean_squared_error
 import numpy as np
-import brevitas.nn as qnn
 import matplotlib.pyplot as plt
-import ast
-import re
-import math
+
 from optparse import OptionParser
-
-
-#Class to register as forward hook to collect outputs of intermediate layers
-class SaveOutput:
-    def __init__(self):
-        self.outputs = []
-
-    def __call__(self, module, module_in, module_out):
-        self.outputs.append(module_out)
-
-    def clear(self):
-        self.outputs = []
-
-def parse_config(config_file) :
-    print("Loading configuration from", config_file)
-    config = open(config_file, 'r')
-    return yaml.load(config, Loader=yaml.FullLoader)
-
-
-def plot_metric_vs_bitparam(model_set,metric_results_set,bit_params_set,base_metrics_set,metric_text):
-    # NOTE: Assumes that the first object in the base metrics set is the true base of comparison
-    # now = datetime.now()
-    #time = now.strftime("%d-%m-%Y_%H-%M-%S")
-
-    #filename = '{}_vs_bitparams'.format(metric_text) + str(time) + '.png'
-
-    rel_perf_plt = plt.figure()
-    rel_perf_ax = rel_perf_plt.add_subplot()
-
-    for model, metric_results, bit_params in zip(model_set, metric_results_set, bit_params_set):
-        nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
-        rel_perf_ax.plot(bit_params, metric_results, linestyle='solid', marker='.', alpha=1, label='Pruned {}b'.format(nbits))
-
-    #Plot "base"/unpruned model points
-    for model, base_metric in zip(model_set,base_metrics_set):
-        # base_metric = [[num_params],[base_metric]]
-        nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
-        rel_perf_ax.plot((base_metric[0] * nbits), 1/(base_metric[1]/base_metrics_set[0][1]), linestyle='solid', marker="X", alpha=1, label='Unpruned {}b'.format(nbits))
-
-    rel_perf_ax.set_ylabel("1/{}/FP{}".format(metric_text,metric_text))
-    rel_perf_ax.set_xlabel("Bit Params (Params * bits)")
-    rel_perf_ax.grid(color='lightgray', linestyle='-', linewidth=1, alpha=0.3)
-    rel_perf_ax.legend(loc='best')
-    rel_perf_plt.savefig("rel_{}_BOPS.png".format(metric_text))
-    rel_perf_plt.show()
+from tools.parse_yaml_config import parse_config
+from tools.aiq import calc_AiQ
+from tools.param_count import countNonZeroWeights, calc_BOPS
 
 def ae_MSE(model, model_file, test_loaders):
     errors_list = []
@@ -101,8 +53,9 @@ def ae_MSE(model, model_file, test_loaders):
     return np.mean(errors_list)
 
 def gen_model_dict(bopmodel, dir):
+    # generates dictionary of models and according to their BOPS values, given a folder containing the model files
     # Provide an instance of the model you're loading (to calculate # params)
-    # and the path to folder containing model files, returns a dict with the format {pruned params:path to model}
+    # and the path to folder containing model files, returns a dict with the format {BOPS:path to model}
     # and the total count of params in that model. Excepts if a model with a different total param count is found
     model_dict = {}
     first = True
@@ -132,232 +85,6 @@ def gen_model_dict(bopmodel, dir):
     else:
         raise RuntimeError("Error! Unable to find directory " + dir)
 
-def gen_bo_model_dict(dir):
-    ### WARNING ONLY USED A TRUSTED RESULTS FILE, THIS USES EVAL WHICH IS KIND OF BAD AND VERY UNSAFE OTHERWISE ###
-    # Modified to load a set of BO models (with varying layer sizes)
-    # Provide an instance of the model you're loading (to calculate # params)
-    # and the path to folder containing model files, returns a dict with the format {pruned params:path to model}
-    # and the total count of params in that model. Excepts if a model with a different total param count is found
-    model_dict = {}
-    model_sizes = []
-    first = True
-    total_param = 0
-    if os.path.isdir(dir):
-        print("Directory found! Loading dir: " + dir)
-        dir_list = os.listdir(dir)
-        dir_list.sort()
-        for file in dir_list:
-            try:
-                sizestr = re.search('(_\d\d?-\d\d?-\d\d?_)',file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
-                size = ast.literal_eval(sizestr)
-                dims = size
-                prune_masks = {
-                "fc1": torch.ones(dims[0], 16),
-                "fc2": torch.ones(dims[1], dims[0]),
-                "fc3": torch.ones(dims[2], dims[1])}
-                bomodel = models.three_layer_model_bv_tunable(prune_masks,size) #Shouldnt have to worry about correct precision for simple param count (for now)
-                bomodel.load_state_dict(torch.load(os.path.join(dir, file), map_location=device))
-                count, total_param, _, _ = countNonZeroWeights(bomodel)
-                bops = calc_BOPS(bomodel)
-                model_dict.update({int(bops): file})
-            except Exception as e:
-                print("Warning! Failed to load file " + file)
-                print(e)
-        return model_dict, total_param
-    else:
-        raise RuntimeError("Error! Unable to find directory " + dir)
-
-def countNonZeroWeights(model):
-    nonzero = total = 0
-    layer_count_alive = {}
-    layer_count_total = {}
-    for name, p in model.named_parameters():
-        tensor = p.data.cpu().numpy()
-        nz_count = np.count_nonzero(tensor)
-        total_params = np.prod(tensor.shape)
-        layer_count_alive.update({name: nz_count})
-        layer_count_total.update({name: total_params})
-        nonzero += nz_count
-        total += total_params
-        print(f'{name:20} | nonzeros = {nz_count:7} / {total_params:7} ({100 * nz_count / total_params:6.2f}%) | total_pruned = {total_params - nz_count :7} | shape = {tensor.shape}')
-    print(f'alive: {nonzero}, pruned : {total - nonzero}, total: {total}, Compression rate : {total/nonzero:10.2f}x  ({100 * (total-nonzero) / total:6.2f}% pruned)')
-    return nonzero, total, layer_count_alive, layer_count_total
-
-def calc_BOPS(model, input_data_precision=32):
-    last_bit_width = input_data_precision
-    alive, total,l_alive,l_total = countNonZeroWeights(model)
-    b_w = model.weight_precision if hasattr(model, 'weight_precision') else 32
-    total_BOPS = 0
-    for name, module in model.named_modules():
-        if isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear):
-            b_a = last_bit_width
-            #b_w = module.quant_weight_bit_width #Dont think this is a property I can access sadly, going with precision as given set in model
-            n = module.in_features
-            m = module.out_features
-            total = l_total[name+'.weight'] + l_total[name+'.bias']
-            alive = l_alive[name + '.weight'] + l_alive[name + '.bias']
-            p = 1 - ((total - alive) / total)  # fraction of layer remaining
-            #assuming b_a is the output bitwidth of the last layer
-            #module_BOPS = m*n*p*(b_a*b_w + b_a + b_w + math.log2(n))
-            module_BOPS = m * n * (p * b_a * b_w + b_a + b_w + math.log2(n))
-            print("{} BOPS: {} = {}*{}({}*{}*{} + {} + {} + {})".format(name,module_BOPS,m,n,p,b_a,b_w,b_a,b_w,math.log2(n)))
-            last_bit_width = b_w
-            total_BOPS += module_BOPS
-    print("Total BOPS: {}".format(total_BOPS))
-    return total_BOPS
-
-def calc_AiQ(model,model_file):
-    """ Calculate efficiency of network using TensorEfficiency """
-    model.load_state_dict(torch.load(os.path.join(model_file), map_location=device))
-    # Time the execution
-    start_time = time.time()
-
-    # Set up the data
-    ensemble = {}
-    accuracy = 0
-    accuracy_list = []
-    roc_list = []
-    sel_bkg_reject_list = []
-    # Initialize arrays for storing microstates
-    if options.batnorm:
-        microstates = {name: np.ndarray([]) for name, module in model.named_modules() if
-                       ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
-                       or (isinstance(module, torch.nn.BatchNorm1d))}
-        microstates_count = {name: 0 for name, module in model.named_modules() if
-                             ((isinstance(module, torch.nn.Linear) or isinstance(module,qnn.QuantLinear)) and name == 'fc4') \
-                             or (isinstance(module, torch.nn.BatchNorm1d))}
-    else:
-        microstates = {name: np.ndarray([]) for name, module in model.named_modules() if
-                       isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)}
-        microstates_count = {name: 0 for name, module in model.named_modules() if
-                             isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)}
-
-    activation_outputs = SaveOutput()  # Our forward hook class, stores the outputs of each layer it's registered to
-
-    # register a forward hook to get and store the activation at each Linear layer while running
-    layer_list = []
-    for name, module in model.named_modules():
-        if options.batnorm:
-            if ((isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear)) and name == 'fc4') \
-                    or (
-            isinstance(module, torch.nn.BatchNorm1d)):  # Record @ BN output except last layer (since last has no BN)
-                module.register_forward_hook(activation_outputs)
-                layer_list.append(name)  # Probably a better way to do this, but it works,
-        else:
-            if (isinstance(module, torch.nn.Linear) or isinstance(module,
-                                                                  qnn.QuantLinear)):  # We only care about linear layers except the last
-                module.register_forward_hook(activation_outputs)
-                layer_list.append(name)  # Probably a better way to do this, but it works,
-    # Process data using torch dataloader, in this case we
-    for i, data in enumerate(test_loader, 0):
-        activation_outputs.clear()
-        local_batch, local_labels = data
-
-        # Run through our test batch and get inference results
-        with torch.no_grad():
-            local_batch, local_labels = local_batch.to(device), local_labels.to(device)
-            outputs = model(local_batch.float())
-
-        # Calculate accuracy (top-1 averaged over each of n=5 classes)
-        outputs.cpu()
-        predlist = torch.zeros(0, dtype=torch.long, device='cpu')
-        lbllist = torch.zeros(0, dtype=torch.long, device='cpu')
-        _, preds = torch.max(outputs, 1)
-        predlist = torch.cat([predlist, preds.view(-1).cpu()])
-        lbllist = torch.cat([lbllist, torch.max(local_labels, 1)[1].view(-1).cpu()])
-        accuracy_list.append(np.average((accuracy_score(lbllist.numpy(), predlist.numpy()))))
-        roc_list.append(roc_auc_score(np.nan_to_num(local_labels.numpy()), np.nan_to_num(outputs.numpy())))
-
-        #Calculate background eff @ signal eff of 50%
-        df = pd.DataFrame()
-        fpr = {}
-        tpr = {}
-        auc1 = {}
-        bkg_reject = {}
-        predict_test = outputs.numpy()
-        # X = TPR, Y = FPR
-        for i, label in enumerate(test_dataset.labels_list):
-            df[label] = local_labels[:, i]
-            df[label + '_pred'] = predict_test[:, i]
-            fpr[label], tpr[label], threshold = roc_curve(np.nan_to_num(df[label]), np.nan_to_num(df[label + '_pred']))
-            bkg_reject[label] = np.interp(0.5, np.nan_to_num(tpr[label]), (np.nan_to_num(fpr[label]))) # Get background rejection factor @ Sig Eff = 50%
-            auc1[label] = auc(np.nan_to_num(fpr[label]), np.nan_to_num(tpr[label]))
-        sel_bkg_reject_list.append(bkg_reject)
-
-        #Calculate microstates for this run
-        for name, x in zip(layer_list, activation_outputs.outputs):
-            # print("---- AIQ Calc ----")
-            # print("Act list: " + name + str(x))
-            x = x.numpy()
-            # Initialize the layer in the ensemble if it doesn't exist
-            if name not in ensemble.keys():
-                ensemble[name] = {}
-
-            # Initialize an array for holding layer states if it has not already been initialized
-            sort_count_freq = 5  # How often (iterations) we sort/count states
-            if microstates[name].size == 1:
-                microstates[name] = np.ndarray((sort_count_freq * np.prod(x.shape[0:-1]), x.shape[-1]), dtype=bool,
-                                               order='F')
-
-            # Store the layer states
-            new_count = microstates_count[name] + np.prod(x.shape[0:-1])
-            microstates[name][
-            microstates_count[name]:microstates_count[name] + np.prod(x.shape[0:-1]), :] = np.reshape(x > 0,
-                                                                                                      (-1, x.shape[-1])
-                                                                                                      , order='F')
-            # Only sort/count states every 5 iterations
-            if new_count < microstates[name].shape[0]:
-                microstates_count[name] = new_count
-                continue
-            else:
-                microstates_count[name] = 0
-
-            # TensorEfficiency.sort_microstates aggregates microstates by sorting
-            sorted_states, index = TensorEfficiency.sort_microstates(microstates[name], True)
-
-            # TensorEfficiency.accumulate_ensemble stores the the identity of each observed
-            # microstate and the number of times that microstate occurred
-            TensorEfficiency.accumulate_ensemble(ensemble[name], sorted_states, index)
-        # If the current layer is the final layer, record the class prediction
-        # if isinstance(module, torch.nn.Linear) or isinstance(module, qnn.QuantLinear):
-
-    # Calculate efficiency and entropy of each layer
-    layer_metrics = {}
-    metrics = ['efficiency', 'entropy', 'max_entropy']
-    for layer, states in ensemble.items():
-        layer_metrics[layer] = {key: value for key, value in zip(metrics, TensorEfficiency.layer_efficiency(states))}
-    sel_bkg_reject = {}
-    accuracy = np.average(accuracy_list)
-    auc_roc = np.average(roc_list)
-    #print(sel_bkg_reject_list)
-    for label in test_dataset.labels_list:
-        sel_bkg_reject.update({label: np.average([batch[label] for batch in sel_bkg_reject_list])})
-    metric = auc_roc #auc_roc or accuracy
-    # Calculate network efficiency and aIQ, with beta=2
-    net_efficiency = TensorEfficiency.network_efficiency([m['efficiency'] for m in layer_metrics.values()])
-    aiq = TensorEfficiency.aIQ(net_efficiency, metric, 2)
-
-    # Display information
-    print('---------------------------------------')
-    print('Network analysis using TensorEfficiency')
-    print('---------------------------------------')
-    for layer, metrics in layer_metrics.items():
-        print('({}) Layer Efficiency: {}'.format(layer, metrics['efficiency']))
-    print('Network Efficiency: {}'.format(net_efficiency))
-    print('Accuracy: {}'.format(accuracy))
-    print('AUC ROC Score: {}'.format(auc_roc))
-    print('aIQ: {}'.format(aiq))
-    print('Execution time: {}'.format(time.time() - start_time))
-    print('')
-    #Return AiQ along with our metrics
-    return {'AiQ':aiq,
-            'accuracy':accuracy,
-            'auc_roc':auc_roc,
-            'net_efficiency':net_efficiency,
-            'sel_bkg_reject':sel_bkg_reject,
-            'layer_metrics':layer_metrics}
-
-
 """ Load the model and test dataset """
 parser = OptionParser()
 parser.add_option('-i','--input',action='store',type='string',dest='model_files',default='model_files/full_dataset/',
@@ -374,8 +101,6 @@ parser.add_option('-s', '--no_bn_stats', action='store_false', dest='bn_stats', 
                   help='disable BN running statistics')
 parser.add_option('-b', '--no_batnorm', action='store_false', dest='batnorm', default=True,
                   help='disable BatchNormalization (BN) Layers ')
-parser.add_option('-r', '--no_l1reg', action='store_false', dest='l1reg', default=True,
-                  help='disable L1 Regularization totally ')
 
 (options,args) = parser.parse_args()
 
@@ -496,7 +221,7 @@ for model_bops, model_file in sorted(float_model_set.items()):
         loadmodel = models.three_layer_model_masked(prune_mask_set)  # 32b
 
     print('Calculating AiQ for 32b, ' + str(model_bops) + ' BOPS')
-    float_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '32b', model_file))})
+    float_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '32b', model_file), batnorm = options.batnorm, device='cpu')})
 
 quant_4b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_4b.items()):
@@ -505,7 +230,7 @@ for model_bops, model_file in sorted(quant_model_set_4b.items()):
     else:
         loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 4)
     print('Calculating AiQ for 4b, ' + str(model_bops) + ' BOPS')
-    quant_4b_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '4b', model_file))})
+    quant_4b_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '4b', model_file), batnorm = options.batnorm, device='cpu')})
 
 quant_6b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_6b.items()):
@@ -514,7 +239,7 @@ for model_bops, model_file in sorted(quant_model_set_6b.items()):
     else:
         loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 6)
     print('Calculating AiQ for 6b, ' + str(model_bops) + ' BOPS')
-    quant_6b_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '6b',model_file))})
+    quant_6b_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '6b',model_file), batnorm = options.batnorm, device='cpu')})
 
 quant_12b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_12b.items()):
@@ -523,7 +248,7 @@ for model_bops, model_file in sorted(quant_model_set_12b.items()):
     else:
         loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 12)
     print('Calculating AiQ for 12b, ' + str(model_bops) + ' BOPS')
-    quant_12b_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '12b', model_file))})
+    quant_12b_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '12b', model_file), batnorm = options.batnorm, device='cpu')})
 
 quant_batnorm_AiQ = {}
 for model_bops, model_file in sorted(quant_batnorm_model_set.items()):
@@ -532,7 +257,7 @@ for model_bops, model_file in sorted(quant_batnorm_model_set.items()):
     else:
         loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 8)
     print('Calculating AiQ for 8b w/ BatchNorm, ' + str(model_bops) + ' BOPS')
-    quant_batnorm_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir,'8b',model_file))})
+    quant_batnorm_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir,'8b',model_file), batnorm = options.batnorm, device='cpu')})
 
 import json
 dump_dict={ '32b':float_AiQ,

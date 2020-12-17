@@ -1,228 +1,255 @@
 import torch.nn as nn
 import torch
-import pandas as pd
 import models
 import jet_dataset
 import matplotlib.pyplot as plt
 from optparse import OptionParser
-from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix, average_precision_score, auc
 import torch.optim as optim
-import yaml
 import math
-import seaborn as sn
-from tools import plot_weights
+import json
+import numpy as np
 from datetime import datetime
-import os
+import os.path as path
 
-## Config module
-def parse_config(config_file) :
+from training.train_funcs import train, val, test
+from training.early_stopping import EarlyStopping
+from tools.aiq import calc_AiQ
+from tools.parse_yaml_config import parse_config
+from tools.param_count import calc_BOPS
 
-    print("Loading configuration from", config_file)
-    config = open(config_file, 'r')
-    return yaml.load(config, Loader=yaml.FullLoader)
+
+def create_model(parameterization, bits):
+    try:
+        dims = [parameterization['fc1s'], parameterization['fc2s'], parameterization['fc3s']]
+    except:
+        try:
+            dims = [parameterization[0], parameterization[1], parameterization[2]]
+        except Exception as e:
+            print("Warning! Malformed mode size array: {}".format(dims))
+            print("Caught Exception: {}".format(e))
+
+    prune_mask = {
+        "fc1": torch.ones(dims[0], 16),
+        "fc2": torch.ones(dims[1], dims[0]),
+        "fc3": torch.ones(dims[2], dims[1]),
+        "fc4": torch.ones(5, dims[2])}
+    print("Creating model with the following dims:{}".format(dims))
+    model = models.three_layer_model_bv_tunable(prune_mask, dims, precision=bits)
+
+    return model, prune_mask
 
 
-if __name__ == "__main__":
+
+if __name__ == "__main__": # If running, train a single model given some parameters
     parser = OptionParser()
     parser.add_option('-i','--input'   ,action='store',type='string',dest='inputFile'   ,default='', help='location of data to train off of')
     parser.add_option('-o','--output'   ,action='store',type='string',dest='outputDir'   ,default='train_simple/', help='output directory')
     parser.add_option('-t','--test'   ,action='store',type='string',dest='test'   ,default='', help='Location of test data set')
     parser.add_option('-l','--load', action='store', type='string', dest='modelLoad', default=None, help='Model to load instead of training new')
     parser.add_option('-c','--config'   ,action='store',type='string',dest='config'   ,default='configs/train_config_threelayer.yml', help='tree name')
-    parser.add_option('-e','--epochs'   ,action='store',type='int', dest='epochs', default=100, help='number of epochs to train for')
+    parser.add_option('-e','--epochs'   ,action='store',type='int', dest='epochs', default=250, help='number of epochs to train for')
+    parser.add_option('-s', '--size', action='store', type='str', dest='size', default='64,32,32', help='Size of the model in format Hidden1,Hidden2,Hidden3')
+    parser.add_option('-b', '--bits', action='store', type='int', dest='bits', default=32, help='bits of precision to quantize to')
+    parser.add_option('-p', '--patience', action='store', type='int', dest='patience', default=10, help='Early Stopping patience in epochs')
+    parser.add_option('-n', '--net_efficiency', action='store_true', dest='efficiency_calc', default=False, help='Enable Per-Epoch efficiency calculation (adds train time)')
     (options,args) = parser.parse_args()
     yamlConfig = parse_config(options.config)
 
     #current_model = models.three_layer_model() # Float Model
-    current_model = models.three_layer_model_bv() # Quantized Model
+    model_size = [int(m) for m in options.size.split(',')]
 
+    nbits = options.bits
+    model, prune_mask = create_model(model_size, nbits) #Create quanized model of a given size and precision
 
-
-    # CUDA for PyTorch
+    # Setup cuda
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
+    print("Using Device: {}".format(device))
+    if use_cuda:
+        print("cuda:0 device type: {}".format(torch.cuda.get_device_name(0)))
 
-    L1_alpha = yamlConfig['L1RegR'] if 'L1RegR' in yamlConfig else 0.01  # Keras default value if not specified
-    criterion = nn.BCELoss()
-    L1_Loss = nn.L1Loss()
-    optimizer = optim.Adam(current_model.parameters(), lr=0.0001, weight_decay=1e-5) #l2 weight reg since L1 is a bit more of a pain to implement
-    batch_size = 1024 #200
-    full_dataset = jet_dataset.ParticleJetDataset(options.inputFile,yamlConfig)
+    # Set Batch size and split value
+    batch_size = 1024
+    train_split = 0.75
+
+    # Setup and split dataset
+    full_dataset = jet_dataset.ParticleJetDataset(options.inputFile, yamlConfig)
     test_dataset = jet_dataset.ParticleJetDataset(options.test, yamlConfig)
-    train_size = int(0.75 * len(full_dataset)) #25% for Validation set, 75% for train set
+    train_size = int(train_split * len(full_dataset))  # 25% for Validation set, 75% for train set
+
     val_size = len(full_dataset) - train_size
     test_size = len(test_dataset)
-    num_val_batches = math.ceil(val_size/batch_size)
-    num_train_batches = math.ceil(train_size/batch_size)
+
+    num_val_batches = math.ceil(val_size / batch_size)
+    num_train_batches = math.ceil(train_size / batch_size)
     print("train_batches " + str(num_train_batches))
     print("val_batches " + str(num_val_batches))
-    train_dataset, val_dataset =  torch.utils.data.random_split(full_dataset,[train_size,val_size])
+
+    train_dataset, val_dataset = torch.utils.data.random_split(full_dataset, [train_size, val_size])
+
     print("train dataset size: " + str(len(train_dataset)))
     print("validation dataset size: " + str(len(val_dataset)))
     print("test dataset size: " + str(len(test_dataset)))
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
-                                              shuffle=True, num_workers=0) #FFS, have to use numworkers = 0 because apparently h5 objects can't be pickled, https://github.com/WuJie1010/Facial-Expression-Recognition.Pytorch/issues/69
 
-    val_loader =   torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
-                                              shuffle=True, num_workers=0)
+    # Setup dataloaders with our dataset
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
+                                               shuffle=True, num_workers=10,
+                                               pin_memory=True)  # FFS, have to use numworkers = 0 because apparently h5 objects can't be pickled, https://github.com/WuJie1010/Facial-Expression-Recognition.Pytorch/issues/69
+
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
+                                             shuffle=True, num_workers=10, pin_memory=True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=test_size,
-                                              shuffle=False, num_workers=0)
+                                              shuffle=False, num_workers=10, pin_memory=True)
+
     val_losses = []
     train_losses = []
     roc_auc_scores = []
     avg_precision_scores = []
+    avg_train_losses = []
+    avg_valid_losses = []
     accuracy_scores = []
-    current_model.to(device)
+    iter_eff = []
+
+    early_stopping = EarlyStopping(patience=options.patience, verbose=True)
+
+    model.update_masks(prune_mask)  # Make sure to update the masks within the model
+
+    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    criterion = nn.BCELoss()
+
+    L1_factor = 0.0001  # Default Keras L1 Loss
+    estop = False
+    epoch_counter = 0
+
+    model.to(device)
+    model.mask_to_device(device)
+
+    if options.efficiency_calc and epoch_counter == 0:  # Get efficiency of un-initalized model
+        aiq_dict, aiq_time = calc_AiQ(model, test_loader, True, device=device)
+        epoch_eff = aiq_dict['net_efficiency']
+        iter_eff.append(aiq_dict)
+        print('[epoch 0] Model Efficiency: %.7f' % epoch_eff)
+        for layer in aiq_dict["layer_metrics"]:
+            print('[epoch 0]\t Layer %s Efficiency: %.7f' % (layer, aiq_dict['layer_metrics'][layer]['efficiency']))
 
     for epoch in range(options.epochs):  # loop over the dataset multiple times
-        running_loss = 0.0
-        # Training
-        for i, data in enumerate(train_loader, 0):
-            local_batch, local_labels = data
-            current_model.train()
-            local_batch, local_labels = local_batch.to(device), local_labels.to(device)
-            # forward + backward + optimize
-            optimizer.zero_grad()
-            outputs = current_model(local_batch.float())
-            criterion_loss = criterion(outputs,local_labels.float())
-            #criterion_loss = criterion(outputs, torch.max(local_labels, 1)[1]) #via https://discuss.pytorch.org/t/runtimeerror-multi-target-not-supported-newbie/10216/2
-            #l1 = L1_Loss(outputs, torch.max(local_labels, 1)[1])
-            #l1 reg on weights
+        epoch_counter += 1
+        # Train
+        model, train_losses = train(model, optimizer, criterion, train_loader, L1_factor=L1_factor)
 
-            #L1_reg = torch.tensor(0., requires_grad=True)
-            #for name, param in current_model.named_parameters():
-            #    if 'weight' in name:
-            #        L1_reg = L1_reg + torch.norm(param, 1)
-            total_loss = criterion_loss# + (L1_reg*L1_alpha)
-            total_loss.backward()
-            optimizer.step()
-            step_loss = total_loss.item()
-            #train_losses.append(step_loss)
-            if i == num_train_batches-1: #print every 8 batches for less console spam
-                print('[epoch %d, batch: %1d] train batch loss: %.7f' % (epoch + 1, i + 1, step_loss))
-                train_losses.append(step_loss)
-            # Validation
-        with torch.set_grad_enabled(False):
-            current_model.eval()
-            for i, data in enumerate(val_loader, 0):
-                local_batch, local_labels = data
-                local_batch, local_labels = local_batch.to(device), local_labels.to(device)
-                outputs = current_model(local_batch.float())
-                #l1 = L1_Loss(outputs, torch.max(local_labels, 1)[1])
-                #for name, param in current_model.named_parameters():
-                #    if 'weight' in name:
-                #        L1_reg = L1_reg + torch.norm(param, 1)
-                val_loss = criterion(outputs,local_labels.float())#  + (L1_alpha * L1_reg)
-                #val_loss = criterion(outputs, torch.max(local_labels, 1)[1])  # + (L1_alpha * L1_reg)
-                #print(local_labels.numpy())
-                #print(outputs.numpy())
-                local_batch, local_labels = local_batch.cpu(), local_labels.cpu()
-                outputs = outputs.cpu()
-                val_roc_auc_score = roc_auc_score(local_labels.numpy(), outputs.numpy())
-                val_avg_precision = average_precision_score(local_labels.numpy(), outputs.numpy())
-                #roc_auc_scores.append(val_roc_auc_score)
-                if i == num_val_batches-1:  # print every 8 batches for less console spam
-                    print('[epoch %d, val batch: %1d] val batch loss: %.7f' % (epoch + 1, i + 1, val_loss))
-                    print('[epoch %d, val batch: %1d] val ROC AUC Score: %.7f' % (epoch + 1, i + 1, val_roc_auc_score))
-                    print('[epoch %d, val batch: %1d] val Avg Precision Score: %.7f' % (epoch + 1, i + 1, val_avg_precision))
-                    val_losses.append(val_loss)
-                    roc_auc_scores.append(val_roc_auc_score)
-                    avg_precision_scores.append(val_avg_precision)
-    os.makedirs(options.outputDir,exist_ok=True)
+        # Validate
+        val_losses, val_avg_precision_list, val_roc_auc_scores_list = val(model, criterion, val_loader,
+                                                                          L1_factor=L1_factor)
+
+        # Calculate average epoch statistics
+        try:
+            train_loss = np.average(train_losses)
+        except:
+            train_loss = torch.mean(torch.stack(train_losses)).cpu().numpy()
+
+        try:
+            valid_loss = np.average(val_losses)
+        except:
+            valid_loss = torch.mean(torch.stack(val_losses)).cpu().numpy()
+
+        val_roc_auc_score = np.average(val_roc_auc_scores_list)
+        val_avg_precision = np.average(val_avg_precision_list)
+
+        if options.efficiency_calc:
+            aiq_dict, aiq_time = calc_AiQ(model, test_loader, True, device=device)
+            epoch_eff = aiq_dict['net_efficiency']
+            iter_eff.append(aiq_dict)
+
+        avg_train_losses.append(train_loss.tolist())
+        avg_valid_losses.append(valid_loss.tolist())
+        avg_precision_scores.append(val_avg_precision)
+
+        # Print epoch statistics
+        print('[epoch %d] train batch loss: %.7f' % (epoch + 1, train_loss))
+        print('[epoch %d] val batch loss: %.7f' % (epoch + 1, valid_loss))
+        print('[epoch %d] val ROC AUC Score: %.7f' % (epoch + 1, val_roc_auc_score))
+        print('[epoch %d] val Avg Precision Score: %.7f' % (epoch + 1, val_avg_precision))
+        if options.efficiency_calc:
+            print('[epoch %d] Model Efficiency: %.7f' % (epoch + 1, epoch_eff))
+            print('[epoch %d] aIQ Calc Time: %.7f seconds' % (epoch + 1, aiq_time))
+            for layer in aiq_dict["layer_metrics"]:
+                print('[epoch %d]\t Layer %s Efficiency: %.7f' % (
+                epoch + 1, layer, aiq_dict['layer_metrics'][layer]['efficiency']))
+        # Check if we need to early stop
+        early_stopping(valid_loss, model)
+        if early_stopping.early_stop:
+            print("Early stopping")
+            estop = True
+            epoch_counter -= options.patience
+            break
+
+        # Load last/best checkpoint model saved via earlystopping
+    model.load_state_dict(torch.load('checkpoint.pt'))
+
+    # Time for plots
     now = datetime.now()
     time = now.strftime("%d-%m-%Y_%H-%M-%S")
-    print("ROC AUC Table size: " + str(len(roc_auc_scores)))
-    plt.plot(train_losses,color='r',linestyle='solid', alpha=0.3)
-    plt.plot(val_losses, color='g',linestyle='dashed')
-    plt.legend(['Train Loss', 'Val Loss'], loc='upper left')
-    plt.ylabel("Batch Loss (Per " + str(batch_size) + " Samples)")
-    plt.xlabel("Epoch")
-    plt.savefig(options.outputDir + 'loss_' + str(time) +'.png')
-    plt.show()
-    plt.plot(roc_auc_scores,color='r',linestyle='solid', alpha=0.3)
-    plt.ylabel("ROC AUC")
-    plt.xlabel("Epoch")
-    plt.savefig(options.outputDir + 'ROCAUC_' + str(time) + '.png')
-    plt.show()
-    plt.plot(avg_precision_scores,color='r',linestyle='solid', alpha=0.3)
-    plt.ylabel("Avg Precision")
-    plt.xlabel("Epoch")
-    plt.savefig(options.outputDir + 'avgPrec_' + str(time) + '.png')
-    plt.show()
 
-    # Initialize the prediction and label lists(tensors)
-    predlist = torch.zeros(0, dtype=torch.long, device='cpu')
-    lbllist = torch.zeros(0, dtype=torch.long, device='cpu')
-    outlist = torch.zeros(0, dtype=torch.double, device='cpu')
-    prob_labels = torch.zeros(0, dtype=torch.double, device='cpu')
-    fpr = dict()
-    tpr = dict()
-    roc_auc = dict()
-    with torch.no_grad():
-        for i, data in enumerate(test_loader):
-            current_model.eval()
-            local_batch, local_labels = data
-            local_batch, local_labels = local_batch.to(device), local_labels.to(device)
-            outputs = current_model(local_batch.float())
-            _, preds = torch.max(outputs, 1)
-            # Append batch prediction results
-            outlist = torch.cat([outlist, outputs.cpu().type(torch.DoubleTensor)]).type(torch.DoubleTensor)
-            prob_labels = torch.cat([prob_labels, local_labels.cpu().type(torch.DoubleTensor)]).type(torch.DoubleTensor)
-            predlist = torch.cat([predlist, preds.view(-1).cpu()])
-            lbllist = torch.cat([lbllist, torch.max(local_labels, 1)[1].view(-1).cpu()])
-            lo = prob_labels.cpu()
-            outlist = outlist.cpu()
+    # Plot & save losses for this iteration
+    loss_plt = plt.figure()
+    loss_ax = loss_plt.add_subplot()
 
-        outputs = outputs.cpu()
-        local_labels = local_labels.cpu()
-        predict_test = outputs.numpy()
-        print(len(predict_test))
-        df = pd.DataFrame()
-        fpr = {}
-        tpr = {}
-        auc1 = {}
+    loss_ax.plot(range(1, len(avg_train_losses) + 1), avg_train_losses, label='Training Loss')
+    loss_ax.plot(range(1, len(avg_valid_losses) + 1), avg_valid_losses, label='Validation Loss')
 
-        plt.figure()
-        for i, label in enumerate(full_dataset.labels_list):
-            print(str(i) + " " + label)
-            print(predict_test[:, i])
-            df[label] = local_labels[:, i]
-            print(df)
-            print(len(predict_test[:, i]))
-            df[label + '_pred'] = predict_test[:, i]
-
-            fpr[label], tpr[label], threshold = roc_curve(df[label], df[label + '_pred'])
-
-            auc1[label] = auc(fpr[label], tpr[label])
-
-            plt.plot(tpr[label], fpr[label],
-                     label='%s tagger, AUC = %.1f%%' % (label.replace('j_', ''), auc1[label] * 100.))
-        plt.semilogy()
-        plt.xlabel("Signal Efficiency")
-        plt.ylabel("Background Efficiency")
-        plt.ylim(0.001, 1)
-        plt.grid(True)
-        plt.legend(loc='upper left')
-        plt.figtext(0.25, 0.90, '(Unpruned)', fontweight='bold', wrap=True, horizontalalignment='right', fontsize=14)
-        plt.savefig(options.outputDir + 'ROC_' + str(time) + '.png' % ())
-
-    # Confusion matrix
-    conf_mat = confusion_matrix(lbllist.numpy(), predlist.numpy())
-    df_cm = pd.DataFrame(conf_mat, index=[i for i in full_dataset.labels_list],
-                         columns=[i for i in full_dataset.labels_list])
-    plt.figure(figsize=(10, 7))
-    sn.heatmap(df_cm, annot=True,fmt='g')
-    plt.savefig(options.outputDir + 'confMatrix_' + str(time) + '.png')
-    plt.show()
-    print(conf_mat)
-    class_accuracy = 100 * conf_mat.diagonal() / conf_mat.sum(1)
-    print(class_accuracy)
-
-    torch.save(current_model.state_dict(), options.outputDir + 'JetClassifyModel_' + str(time) + '.pt')
-    os.makedirs(options.outputDir+'weight_dists/',exist_ok=True)
-    plot_weights.plot_kernels(current_model, text=" (Locally Pruned)",
-                              output=options.outputDir+'weight_dists/'+'weight_dist_' + str(time) + '.png')
+    # find position of lowest validation loss
+    if estop:
+        minposs = avg_valid_losses.index(min(avg_valid_losses))
+    else:
+        minposs = options.epochs
 
 
-    print('Finished Training')
+    # update our epoch counter to represent where the model actually stopped training
+    epoch_counter -= ((len(avg_valid_losses)) - minposs)
+
+    nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
+    # Plot losses for this iter
+
+    loss_ax.axvline(minposs, linestyle='--', color='r', label='Early Stopping Checkpoint')
+    loss_ax.set_xlabel('epochs')
+    loss_ax.set_ylabel('loss')
+    loss_ax.grid(True)
+    loss_ax.legend()
+    filename = 'loss_plot_{}b_e{}_{}_.png'.format(nbits, epoch_counter, time)
+    loss_ax.set_title('Loss from epoch 1 to {}, {}b model'.format(epoch_counter, nbits))
+    loss_plt.savefig(path.join(options.outputDir, filename), bbox_inches='tight')
+    loss_plt.show()
+    plt.close(loss_plt)
+    if options.efficiency_calc:
+        # Plot & save eff for this iteration
+        loss_plt = plt.figure()
+        loss_ax = loss_plt.add_subplot()
+        loss_ax.set_title('Net Eff. from epoch 0 to {}, {}b model'.format(epoch_counter, nbits))
+        loss_ax.plot(range(0, len(iter_eff)), [z['net_efficiency'] for z in iter_eff],
+                     label='Net Efficiency', color='green')
+
+        # loss_ax.plot(range(1, len(iter_eff) + 1), [z["layer_metrics"][layer]['efficiency'] for z in iter_eff])
+        loss_ax.axvline(minposs, linestyle='--', color='r', label='Early Stopping Checkpoint')
+        loss_ax.set_xlabel('epochs')
+        loss_ax.set_ylabel('Net Efficiency')
+        loss_ax.grid(True)
+        loss_ax.legend()
+        filename = 'eff_plot_{}b_e{}_{}_.png'.format(nbits, epoch_counter, time)
+        loss_plt.savefig(path.join(options.outputDir, filename), bbox_inches='tight')
+        loss_plt.show()
+        plt.close(loss_plt)
+
+    final_aiq, _ = calc_AiQ(model, test_loader, True, device)
+
+    model_totalloss_json_dict = {options.bits: [[avg_train_losses,avg_valid_losses], iter_eff, [minposs]]}
+
+    filename = 'model_losses_{}_{}.json'.format(options.size,options.bits)
+    with open(path.join(options.outputDir, filename), 'w') as fp:
+        json.dump(model_totalloss_json_dict, fp)
+
+    filename = 'model_AIQ_{}_{}.json'.format(options.size, options.bits)
+    with open(path.join(options.outputDir, filename), 'w') as fp:
+        json.dump({'{}b'.format(options.bits): {
+            int(calc_BOPS(model, options.bits)): final_aiq}}, fp)
+
