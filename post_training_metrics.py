@@ -251,10 +251,8 @@ for model_bops, model_file in sorted(quant_model_set_12b.items()):
     else:
         loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 12)
     print('Calculating AiQ for 12b, ' + str(model_bops) + ' BOPS')
-    aiq_dict, aiq_time = calc_AiQ(loadmodel, test_loader, loadfile=os.path.join(dir, '12b', model_file),
-                                  batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
-    print('AIQ Processing time: {}s',aiq_time)
-    quant_12b_AiQ.update({model_bops: aiq_dict})
+    quant_12b_AiQ.update({model_bops: calc_AiQ(loadmodel, test_loader, loadfile=os.path.join(dir, '12b', model_file),
+                                               batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)})
 
 quant_batnorm_AiQ = {}
 for model_bops, model_file in sorted(quant_batnorm_model_set.items()):
