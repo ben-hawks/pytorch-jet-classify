@@ -221,7 +221,7 @@ for model_bops, model_file in sorted(float_model_set.items()):
         loadmodel = models.three_layer_model_masked(prune_mask_set)  # 32b
 
     print('Calculating AiQ for 32b, ' + str(model_bops) + ' BOPS')
-    float_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '32b', model_file), batnorm = options.batnorm, device='cpu')})
+    float_AiQ.update({model_bops: calc_AiQ(loadmodel, test_loader, loadfile=os.path.join(dir, '32b', model_file), batnorm = options.batnorm, device='cpu')})
 
 quant_4b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_4b.items()):
@@ -230,7 +230,7 @@ for model_bops, model_file in sorted(quant_model_set_4b.items()):
     else:
         loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 4)
     print('Calculating AiQ for 4b, ' + str(model_bops) + ' BOPS')
-    quant_4b_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '4b', model_file), batnorm = options.batnorm, device='cpu')})
+    quant_4b_AiQ.update({model_bops: calc_AiQ(loadmodel, test_loader, loadfile=os.path.join(dir, '4b', model_file), batnorm = options.batnorm, device='cpu')})
 
 quant_6b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_6b.items()):
@@ -239,7 +239,7 @@ for model_bops, model_file in sorted(quant_model_set_6b.items()):
     else:
         loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 6)
     print('Calculating AiQ for 6b, ' + str(model_bops) + ' BOPS')
-    quant_6b_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '6b',model_file), batnorm = options.batnorm, device='cpu')})
+    quant_6b_AiQ.update({model_bops: calc_AiQ(loadmodel, test_loader, loadfile=os.path.join(dir, '6b', model_file), batnorm = options.batnorm, device='cpu')})
 
 quant_12b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_12b.items()):
@@ -248,7 +248,7 @@ for model_bops, model_file in sorted(quant_model_set_12b.items()):
     else:
         loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 12)
     print('Calculating AiQ for 12b, ' + str(model_bops) + ' BOPS')
-    quant_12b_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir, '12b', model_file), batnorm = options.batnorm, device='cpu')})
+    quant_12b_AiQ.update({model_bops: calc_AiQ(loadmodel, test_loader, loadfile=os.path.join(dir, '12b', model_file), batnorm = options.batnorm, device='cpu')})
 
 quant_batnorm_AiQ = {}
 for model_bops, model_file in sorted(quant_batnorm_model_set.items()):
@@ -257,7 +257,7 @@ for model_bops, model_file in sorted(quant_batnorm_model_set.items()):
     else:
         loadmodel = models.three_layer_model_bv_masked(prune_mask_set, 8)
     print('Calculating AiQ for 8b w/ BatchNorm, ' + str(model_bops) + ' BOPS')
-    quant_batnorm_AiQ.update({model_bops: calc_AiQ(loadmodel, os.path.join(dir,'8b',model_file), batnorm = options.batnorm, device='cpu')})
+    quant_batnorm_AiQ.update({model_bops: calc_AiQ(loadmodel, test_loader, loadfile=os.path.join(dir, '8b', model_file), batnorm = options.batnorm, device='cpu')})
 
 import json
 dump_dict={ '32b':float_AiQ,

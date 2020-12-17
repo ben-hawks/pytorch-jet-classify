@@ -3,6 +3,7 @@ from tools import TensorEfficiency
 import time as time_lib
 import brevitas.nn as qnn
 import numpy as np
+import os
 
 class SaveOutput:
     def __init__(self):
@@ -14,10 +15,14 @@ class SaveOutput:
     def clear(self):
         self.outputs = []
 
-def calc_AiQ(aiq_model, test_loader, batnorm = True, device='cpu'):
+def calc_AiQ(aiq_model, test_loader, batnorm = True, device='cpu', loadfile=None):
     """ Calculate efficiency of network using TensorEfficiency """
     # Time the execution
     start_time = time_lib.time()
+
+    if loadfile is not None:
+        aiq_model.load_state_dict(torch.load(os.path.join(loadfile), map_location=device))
+
     aiq_model.cpu()
     aiq_model.mask_to_device('cpu')
     aiq_model.eval()
