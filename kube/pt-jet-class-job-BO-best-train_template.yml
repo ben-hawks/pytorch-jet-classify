@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pt-jet-class-job-bo-best-$PRECb
+  name: pt-jet-class-job-bo-best-$PRECb-$RAND
   labels:
     jobgroup: pt-jet-class-job-bo
 spec:
@@ -16,7 +16,7 @@ spec:
         args:
         - /opt/repo/pytorch-jet-classify/train.py
         - -i
-        - /ptjetclassvol/rand_train_data/0/
+        - /ptjetclassvol/rand_train_data/$RAND/
         - -t
         - /ptjetclassvol/train_data/test/
         - -c
@@ -24,7 +24,7 @@ spec:
         - -e
         - "250"
         - -o
-        - /ptjetclassvol/train_output/BO_Output/best
+        - /ptjetclassvol/train_output/BO_Output/$RAND/best
         - -b
         - "$PREC"
         - -n
