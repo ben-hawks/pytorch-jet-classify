@@ -28,12 +28,12 @@ do
   cat pt-jet-bo-job_template.yml | sed "s/\$PREC/$p/" > ./jobs/BO/pt-jet-bo-job-"$p".yaml
 done
 
-  for i in "${rand[@]}"
+for r in "${rand[@]}"
   do
     for ((i=0;i<${#prec[@]};++i)); do
         p=${prec[i]}
         b=${bo_best[i]}
 
-        cat pt-jet-class-job-BO-best-train_template.yml | sed "s/\$RAND/$i/" | sed "s/\$BEST/$b/" | sed "s/\$PREC/$p/" > ./jobs/BO/pt-jet-class-job-BO-best-train-"$p".yaml
+        cat pt-jet-class-job-BO-best-train_template.yml | sed "s/\$RAND/$r/" | sed "s/\$BEST/$b/" | sed "s/\$PREC/$p/" > ./jobs/BO/pt-jet-class-job-BO-best-train-"$p"-"$r".yaml
     done
 done
