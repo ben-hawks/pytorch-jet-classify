@@ -240,6 +240,8 @@ if __name__ == "__main__": # If running, train a single model given some paramet
         loss_plt.show()
         plt.close(loss_plt)
 
+    model_filename = "BO_{}b_best_{}.pth".format(nbits,time)
+    torch.save(model.state_dict(), path.join(options.outputDir, model_filename))
     final_aiq, _ = calc_AiQ(model, test_loader, True, device)
 
     model_totalloss_json_dict = {options.bits: [[avg_train_losses,avg_valid_losses], iter_eff, [minposs]]}
