@@ -9,6 +9,7 @@ import math
 import json
 import numpy as np
 from datetime import datetime
+import os
 import os.path as path
 
 from training.train_funcs import train, val, test
@@ -54,6 +55,10 @@ if __name__ == "__main__": # If running, train a single model given some paramet
     parser.add_option('-n', '--net_efficiency', action='store_true', dest='efficiency_calc', default=False, help='Enable Per-Epoch efficiency calculation (adds train time)')
     (options,args) = parser.parse_args()
     yamlConfig = parse_config(options.config)
+
+    # create given output directory if it doesnt exist
+    if not path.exists(options.outputDir):
+        os.makedirs(options.outputDir, exist_ok=True)
 
     #current_model = models.three_layer_model() # Float Model
     model_size = [int(m) for m in options.size.split(',')]
