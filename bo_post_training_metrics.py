@@ -109,6 +109,7 @@ torch.backends.cudnn.benchmark = True
 # Load datasets
 #yrdy_dataset = jet_dataset.ParticleJetDataset('train_data/train/', yamlConfig)
 test_dataset = jet_dataset.ParticleJetDataset(options.test, yamlConfig)
+test_labels = test_dataset.labels_list
 
 #train_loader = torch.utils.data.DataLoader(full_dataset, batch_size=10000,
 #                                         shuffle=True, num_workers=0)
@@ -162,7 +163,8 @@ for model_bops, model_file in sorted(float_model_set.items()):
         "fc3": torch.ones(dims[2], dims[1]),
         "fc4": torch.ones(5, dims[2])}
     print('Calculating AiQ for BO 32b, ' + str(model_bops) + ' BOPS, size ' + str(size))
-    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,32), test_loader, loadfile=os.path.join(dir, '32b', model_file), batnorm = options.batnorm, device='cpu')
+    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,32), test_loader, loadfile=os.path.join(dir, '32b', model_file),
+                       batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
     results.update({'dims': dims})
     float_AiQ.update({model_bops: results})
 
@@ -177,7 +179,8 @@ for model_bops, model_file in sorted(quant_model_set_12b.items()):
         "fc3": torch.ones(dims[2], dims[1]),
         "fc4": torch.ones(5, dims[2])}
     print('Calculating AiQ for BO 12b, ' + str(model_bops) + ' BOPS, size ' + str(size))
-    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,12), test_loader, loadfile=os.path.join(dir, '12b', model_file), batnorm = options.batnorm, device='cpu')
+    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,12), test_loader, loadfile=os.path.join(dir, '12b', model_file),
+                       batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
     results.update({'dims': dims})
     quant_12b_AiQ.update({model_bops: results})
 
@@ -193,7 +196,8 @@ for model_bops, model_file in sorted(quant_model_set_4b.items()):
         "fc3": torch.ones(dims[2], dims[1]),
         "fc4": torch.ones(5, dims[2])}
     print('Calculating AiQ for BO 4b, ' + str(model_bops) + ' BOPS, size ' + str(size))
-    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,4), test_loader, loadfile=os.path.join(dir, '4b', model_file), batnorm = options.batnorm, device='cpu')
+    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,4), test_loader, loadfile=os.path.join(dir, '4b', model_file),
+                       batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
     results.update({'dims': dims})
     quant_4b_AiQ.update({model_bops: results})
 
@@ -208,7 +212,8 @@ for model_bops, model_file in sorted(quant_model_set_6b.items()):
         "fc3": torch.ones(dims[2], dims[1]),
         "fc4": torch.ones(5, dims[2])}
     print('Calculating AiQ for BO 6b, ' + str(model_bops) + ' BOPS, size ' + str(size))
-    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,6), test_loader, loadfile=os.path.join(dir, '6b', model_file), batnorm = options.batnorm, device='cpu')
+    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,6), test_loader, loadfile=os.path.join(dir, '6b', model_file),
+                       batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
     results.update({'dims': dims})
     quant_6b_AiQ.update({model_bops: results})
 
