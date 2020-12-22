@@ -1,0 +1,58 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pt-jet-postprocess-job-bo-best-75
+  labels:
+    jobgroup: pt-jet-postprocess-bo-best-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: jet-iter-prune
+        image:  gitlab-registry.nautilus.optiputer.net/jmduarte/pytorch-jet-classify:latest
+        terminationMessagePolicy: FallbackToLogsOnError
+        command:
+        - "python"
+        args:
+        - /opt/repo/pytorch-jet-classify/bo_post_training_metrics.py
+        - -t
+        - /ptjetclassvol/train_data/test/
+        - -i
+        - /ptjetclassvol/BO_output/BO_best_models/75/
+        - -o
+        - /ptjetclassvol/BO_output/BO_best_models/75/aiq_plots/
+        - -n
+        - "BO_best_75"
+        volumeMounts:
+        - mountPath: /ptjetclassvol
+          name: pt-jet-class-vol
+        - name: git-repo
+          mountPath: /opt/repo
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "4"
+          requests:
+            memory: 2Gi
+            cpu: "1"
+      initContainers:
+      - name: init-clone-repo
+        image: alpine/git
+        args:
+          - clone
+          - --single-branch
+          - https://github.com/ben-hawks/pytorch-jet-classify
+          - -b
+          - master
+          - /opt/repo/pytorch-jet-classify
+        volumeMounts:
+          - name: git-repo
+            mountPath: /opt/repo
+      volumes:
+      - name: git-repo
+        emptyDir: {}
+      - name: pt-jet-class-vol
+        persistentVolumeClaim:
+          claimName: pt-jet-class-vol
+      restartPolicy: Never
+  backoffLimit: 5

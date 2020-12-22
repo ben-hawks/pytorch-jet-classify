@@ -247,7 +247,7 @@ if __name__ == "__main__": # If running, train a single model given some paramet
 
     model_filename = "BO_{}b_best_{}.pth".format(nbits,time)
     torch.save(model.state_dict(), path.join(options.outputDir, model_filename))
-    final_aiq, _ = calc_AiQ(model, test_loader, True, device)
+    final_aiq, _ = calc_AiQ(model, test_loader, batnorm=True, device=device, full_results=True, testlabels=test_dataset.labels_list)
 
     model_totalloss_json_dict = {options.bits: [[avg_train_losses,avg_valid_losses], iter_eff, [minposs]]}
 
@@ -257,6 +257,5 @@ if __name__ == "__main__": # If running, train a single model given some paramet
 
     filename = 'model_AIQ_{}_{}.json'.format(options.size, options.bits)
     with open(path.join(options.outputDir, filename), 'w') as fp:
-        json.dump({'{}b'.format(options.bits): {
-            int(calc_BOPS(model, options.bits)): final_aiq}}, fp)
+        json.dump({'{}b'.format(options.bits): {int(calc_BOPS(model, options.bits)): final_aiq, 'dims': str(model_size)}}, fp)
 
