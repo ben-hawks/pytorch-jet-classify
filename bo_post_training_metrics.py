@@ -154,9 +154,9 @@ except:
 #Run through each model set, calculating AiQ for each model in the set
 float_AiQ = {}
 for model_bops, model_file in sorted(float_model_set.items()):
-    sizestr = re.search('(_\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
-    size = ast.literal_eval(sizestr)
-    dims = size
+    sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
+    dims = [int(m) for m in sizestr.split(',')]
+    size = dims
     prune_masks = {
         "fc1": torch.ones(dims[0], 16),
         "fc2": torch.ones(dims[1], dims[0]),
@@ -170,9 +170,9 @@ for model_bops, model_file in sorted(float_model_set.items()):
 
 quant_12b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_12b.items()):
-    sizestr = re.search('(_\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
-    size = ast.literal_eval(sizestr)
-    dims = size
+    sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
+    dims = [int(m) for m in sizestr.split(',')]
+    size = dims
     prune_masks = {
         "fc1": torch.ones(dims[0], 16),
         "fc2": torch.ones(dims[1], dims[0]),
@@ -187,9 +187,9 @@ for model_bops, model_file in sorted(quant_model_set_12b.items()):
 
 quant_4b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_4b.items()):
-    sizestr = re.search('(_\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
-    size = ast.literal_eval(sizestr)
-    dims = size
+    sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
+    dims = [int(m) for m in sizestr.split(',')]
+    size = dims
     prune_masks = {
         "fc1": torch.ones(dims[0], 16),
         "fc2": torch.ones(dims[1], dims[0]),
@@ -203,9 +203,9 @@ for model_bops, model_file in sorted(quant_model_set_4b.items()):
 
 quant_6b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_6b.items()):
-    sizestr = re.search('(_\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
-    size = ast.literal_eval(sizestr)
-    dims = size
+    sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
+    dims = [int(m) for m in sizestr.split(',')]
+    size = dims
     prune_masks = {
         "fc1": torch.ones(dims[0], 16),
         "fc2": torch.ones(dims[1], dims[0]),
