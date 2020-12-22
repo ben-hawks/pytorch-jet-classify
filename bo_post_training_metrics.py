@@ -54,7 +54,7 @@ def gen_bo_model_dict(dir, bits=32):
                     "fc2": torch.ones(dims[1], dims[0]),
                     "fc3": torch.ones(dims[2], dims[1]),
                     "fc4": torch.ones(5, dims[2])}
-                bomodel = models.three_layer_model_bv_tunable(prune_masks,size,bits) #Shouldnt have to worry about correct precision for simple param count (for now)
+                bomodel = models.three_layer_model_bv_tunable(prune_masks,dims,bits) #Shouldnt have to worry about correct precision for simple param count (for now)
                 bomodel.load_state_dict(torch.load(os.path.join(dir, file), map_location=device))
                 count, total_param, _, _ = countNonZeroWeights(bomodel)
                 bops = calc_BOPS(bomodel)
