@@ -47,7 +47,7 @@ def gen_bo_model_dict(dir, bits=32):
         dir_list.sort()
         for file in dir_list:
             try:
-                sizestr = re.search('(_\d\d?-\d\d?-\d\d?_)',file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
+                sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
                 dims = [int(m) for m in sizestr.split(',')]
                 prune_masks = {
                     "fc1": torch.ones(dims[0], 16),
