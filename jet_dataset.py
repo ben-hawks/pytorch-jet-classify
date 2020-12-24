@@ -10,7 +10,7 @@ from sklearn import preprocessing
 class ParticleJetDataset(Dataset):
     """CMS Particle Jet dataset."""
 
-    def __init__(self, dataPath, yamlConfig, normalize=True):
+    def __init__(self, dataPath, yamlConfig, normalize=True, folds=False, exclude=""):
         data_path = dataPath
 
         # List of features to use
@@ -22,34 +22,66 @@ class ParticleJetDataset(Dataset):
 
         columns_arr = np.array([])
         features_labels_df = pd.DataFrame()
+        loaded_files = 0
         #Check/Handle directory of files vs 1 file
-        if os.path.isdir(data_path):
-            print("Directory of data files found!")
-            first = True
-            for file in os.listdir(data_path):
-                if file.endswith(".h5") or file.endswith(".h5df"):
-                    try:
-                        print("Loading " + str(file))
-                        self.h5File = h5py.File(os.path.join(data_path,file), 'r', libver='latest', swmr=True)
-                        if first:
-                            columns_arr = np.array(self.h5File['jetFeatureNames'][:]).astype(str)  # slicing h5 data because otherwise it's a reference to the actual file?
-                            first = False
-                        this_file = pd.DataFrame(self.h5File["jets"][:], columns=columns_arr)
-                        features_labels_df = pd.concat([features_labels_df,this_file],axis=0) #concat along axis 0 if doesn't work?
-                        self.h5File.close()
-                    except Exception as e:
-                        print("Error! Failed to load jet file " + file)
-                        print(e)
-        elif os.path.isfile(data_path):
-            print("Single data file found!")
-            self.h5File = h5py.File(dataPath, 'r', libver='latest', swmr=True)
-            # Convert to dataframe
-            columns_arr = np.array(self.h5File['jetFeatureNames'][:]).astype(str)  # slicing h5 data because otherwise it's a reference to the actual file?
-            features_labels_df = pd.DataFrame(self.h5File["jets"][:], columns=columns_arr)
-        else:
-            print("Error! path specified is a special file (socket, FIFO, device file), or isn't valid")
-            print("Given Path: {}".format(data_path))
+        if folds: #Using dataset of .h5 files split into k folds by utilities/k_fold_split.py
+            if os.path.isdir(data_path):
+                print("Directory of data files found!")
+                first = True
+                for file in os.listdir(data_path):
+                    if (file.endswith(".h5") or file.endswith(".h5df")) and (exclude not in file):
+                        try:
+                            print("Loading " + str(file))
+                            self.h5File = h5py.File(os.path.join(data_path,file), 'r', libver='latest', swmr=True)
+                            if first:
+                                columns_arr = np.array(self.h5File['jetFeatureNames'][:]).astype(str)  # slicing h5 data because otherwise it's a reference to the actual file?
+                                first = False
+                            this_file = pd.DataFrame(self.h5File["jets"][:], columns=columns_arr)
+                            features_labels_df = pd.concat([features_labels_df,this_file],axis=0) #concat along axis 0 if doesn't work?
+                            self.h5File.close()
+                            loaded_files +=1
+                        except Exception as e:
+                            print("Error! Failed to load jet file " + file)
+                            print(e)
+            elif os.path.isfile(data_path):
+                print("Single data file found!")
+                self.h5File = h5py.File(dataPath, 'r', libver='latest', swmr=True)
+                # Convert to dataframe
+                columns_arr = np.array(self.h5File['jetFeatureNames'][:]).astype(str)  # slicing h5 data because otherwise it's a reference to the actual file?
+                features_labels_df = pd.DataFrame(self.h5File["jets"][:], columns=columns_arr)
+            else:
+                print("Error! path specified is a special file (socket, FIFO, device file), or isn't valid")
+                print("Given Path: {}".format(data_path))
+        else: #Using a directory full of .h5 files
+            if os.path.isdir(data_path):
+                print("Directory of data files found!")
+                first = True
+                for file in os.listdir(data_path):
+                    if file.endswith(".h5") or file.endswith(".h5df"):
+                        try:
+                            print("Loading " + str(file))
+                            self.h5File = h5py.File(os.path.join(data_path,file), 'r', libver='latest', swmr=True)
+                            if first:
+                                columns_arr = np.array(self.h5File['jetFeatureNames'][:]).astype(str)  # slicing h5 data because otherwise it's a reference to the actual file?
+                                first = False
+                            this_file = pd.DataFrame(self.h5File["jets"][:], columns=columns_arr)
+                            features_labels_df = pd.concat([features_labels_df,this_file],axis=0) #concat along axis 0 if doesn't work?
+                            self.h5File.close()
+                            loaded_files +=1
+                        except Exception as e:
+                            print("Error! Failed to load jet file " + file)
+                            print(e)
+            elif os.path.isfile(data_path):
+                print("Single data file found!")
+                self.h5File = h5py.File(dataPath, 'r', libver='latest', swmr=True)
+                # Convert to dataframe
+                columns_arr = np.array(self.h5File['jetFeatureNames'][:]).astype(str)  # slicing h5 data because otherwise it's a reference to the actual file?
+                features_labels_df = pd.DataFrame(self.h5File["jets"][:], columns=columns_arr)
+            else:
+                print("Error! path specified is a special file (socket, FIFO, device file), or isn't valid")
+                print("Given Path: {}".format(data_path))
 
+        print("Loaded {} files successfully!".format(loaded_files))
         features_labels_df = features_labels_df.drop_duplicates()
         features_df = features_labels_df[features]
         labels_df = features_labels_df[labels]
