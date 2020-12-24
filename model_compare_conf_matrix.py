@@ -4,12 +4,14 @@ import torch
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sn
+import sys
 import os
 import os.path as path
 from optparse import OptionParser
-from tools.parse_yaml_config import parse_config
 import models
+import tools.parse_yaml_config
 import jet_dataset
+
 
 def compare(model, model2, test_loader, outputDir='..', device='cpu', test_dataset_labels=[],filetext="", m1txt="", m2txt=""):
     #device = torch.device('cpu') #required if doing a untrained init check
@@ -55,7 +57,7 @@ if __name__ == "__main__":
         parser.add_option('-c', '--config', action='store', type='string', dest='config',
                           default='../configs/train_config_threelayer.yml', help='tree name')
         (options, args) = parser.parse_args()
-        yamlConfig = parse_config(options.config)
+        yamlConfig = tools.parse_yaml_config.parse_config(options.config)
 
         if not os.path.exists(options.outputDir):  # create given output directory if it doesnt exist
             os.makedirs(options.outputDir)
