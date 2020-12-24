@@ -50,12 +50,12 @@ def compare(model, model2, test_loader, outputDir='..', device='cpu', test_datas
 
 if __name__ == "__main__":
         parser = OptionParser()
-        parser.add_option('-i', '--input', action='store', type='string', dest='inputFile', default='../train_data/test',
+        parser.add_option('-i', '--input', action='store', type='string', dest='inputFile', default='train_data/test',
                           help='location of data to test off of')
-        parser.add_option('-o', '--output', action='store', type='string', dest='outputDir', default='../results/',
+        parser.add_option('-o', '--output', action='store', type='string', dest='outputDir', default='results/',
                           help='output directory')
         parser.add_option('-c', '--config', action='store', type='string', dest='config',
-                          default='../configs/train_config_threelayer.yml', help='tree name')
+                          default='configs/train_config_threelayer.yml', help='tree name')
         (options, args) = parser.parse_args()
         yamlConfig = tools.parse_yaml_config.parse_config(options.config)
 
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         test_labels = test_dataset.labels_list
         # For the time being, load our two specific models that we're testing this plot out with. Will flesh out if
         #warrented later on
-        model_loc = '../model_files/conf_mat_compare'
+        model_loc = 'model_files/conf_mat_compare'
         loadfile1 = path.join(model_loc,'6b_90rand_80pruned_L1.pth')
         loadfile2 = path.join(model_loc,'6b_90rand_80pruned_noL1.pth')
 
