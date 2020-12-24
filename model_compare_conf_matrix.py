@@ -63,7 +63,7 @@ if __name__ == "__main__":
             os.makedirs(options.outputDir)
 
         use_cuda = torch.cuda.is_available()
-        device = torch.device("cuda:0" if use_cuda else "cpu")
+        device = "cpu" # torch.device("cuda:0" if use_cuda else "cpu")
         torch.backends.cudnn.benchmark = True
         print("Using Device: {}".format(device))
         if use_cuda:
