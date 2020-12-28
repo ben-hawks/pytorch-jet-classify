@@ -70,3 +70,4 @@ if __name__ == "__main__":
         features_df = features_labels_df[features]
         labels_df = features_labels_df[labels]
         print(label_count)
+        print(features_labels_df.describe())

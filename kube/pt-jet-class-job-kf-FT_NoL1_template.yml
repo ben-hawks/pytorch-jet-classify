@@ -1,0 +1,68 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pt-jet-class-job-k$K-ft-nol1-$RAND-$PRECb
+  labels:
+    jobgroup: pt-jet-class-job-kf
+spec:
+  template:
+    spec:
+      containers:
+      - name: jet-iter-prune
+        image:  gitlab-registry.nautilus.optiputer.net/jmduarte/pytorch-jet-classify:latest
+        terminationMessagePolicy: FallbackToLogsOnError
+        command:
+        - "python"
+        args:
+        - /opt/repo/pytorch-jet-classify/iter_prune.py
+        - -i
+        - /ptjetclassvol/kf_data/$RAND/
+        - -t
+        - /ptjetclassvol/train_data/test/
+        - -c
+        - /opt/repo/pytorch-jet-classify/configs/train_config_threelayer.yml
+        - -e
+        - "250"
+        - -o
+        - /ptjetclassvol/train_output/kfold/val_$K/FT_$RAND_NoL1/
+        - -m
+        - "$PREC"
+        - -n
+        - -r
+        - -k
+        - "$K"
+        volumeMounts:
+        - mountPath: /ptjetclassvol
+          name: pt-jet-class-vol
+        - name: git-repo
+          mountPath: /opt/repo
+        resources:
+          limits:
+            memory: 8Gi
+            cpu: "4"
+            nvidia.com/gpu: "1"
+          requests:
+            memory: 2Gi
+            cpu: "1"
+            nvidia.com/gpu: "1"
+      initContainers:
+      - name: init-clone-repo
+        image: alpine/git
+        args:
+          - clone
+          - --single-branch
+          - https://github.com/ben-hawks/pytorch-jet-classify
+          - -b
+          - master
+          - /opt/repo/pytorch-jet-classify
+        volumeMounts:
+          - name: git-repo
+            mountPath: /opt/repo
+      volumes:
+      - name: git-repo
+        emptyDir: {}
+      - name: pt-jet-class-vol
+        persistentVolumeClaim:
+          claimName: pt-jet-class-vol
+      restartPolicy: Never
+  backoffLimit: 5

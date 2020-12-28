@@ -10,7 +10,7 @@ from sklearn import preprocessing
 class ParticleJetDataset(Dataset):
     """CMS Particle Jet dataset."""
 
-    def __init__(self, dataPath, yamlConfig, normalize=True, folds=False, exclude=""):
+    def __init__(self, dataPath, yamlConfig, normalize=True, filenames=None):
         data_path = dataPath
 
         # List of features to use
@@ -24,12 +24,12 @@ class ParticleJetDataset(Dataset):
         features_labels_df = pd.DataFrame()
         loaded_files = 0
         #Check/Handle directory of files vs 1 file
-        if folds: #Using dataset of .h5 files split into k folds by utilities/k_fold_split.py
+        if filenames is not None: #Using dataset of .h5 files split into k folds by utilities/k_fold_split.py
             if os.path.isdir(data_path):
                 print("Directory of data files found!")
                 first = True
                 for file in os.listdir(data_path):
-                    if (file.endswith(".h5") or file.endswith(".h5df")) and (exclude not in file):
+                    if (file.endswith(".h5") or file.endswith(".h5df")) and (file in filenames):
                         try:
                             print("Loading " + str(file))
                             self.h5File = h5py.File(os.path.join(data_path,file), 'r', libver='latest', swmr=True)

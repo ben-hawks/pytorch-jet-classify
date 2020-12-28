@@ -7,6 +7,7 @@ import random
 import os
 import numpy as np
 import yaml
+import sklearn.utils as sklu
 from optparse import OptionParser
 
 def parse_config(config_file) :
@@ -25,6 +26,9 @@ if __name__ == "__main__":
                           default='configs/train_config_threelayer.yml', help='tree name')
         parser.add_option('-k', '--kfolds', action='store', type='int', dest='kfolds',
                           default='4', help='How many folds to split the dataset into')
+        parser.add_option('-s', '--no_shuffle', action='store_false', dest='shuffle', default=True,
+                          help='disable shuffling of the dataset before splitting')
+
         (options, args) = parser.parse_args()
         yamlConfig = parse_config(options.config)
 
@@ -64,6 +68,12 @@ if __name__ == "__main__":
                     except Exception as e:
                         print("Error! Failed to load jet file " + file)
                         print(e)
+
+            if options.shuffle:
+                #Shuffle dataset before split, using seed specified in yamlConfig for random shuffle
+                features_labels_df = sklu.shuffle(features_labels_df, random_state=yamlConfig["Seed"])
+                features_labels_df.reset_index(inplace=True,drop=True)
+
             all_data = features_labels_df.to_numpy(dtype=np.float)
             size = len(all_data)
             fold_size = int(size / options.kfolds)

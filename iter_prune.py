@@ -70,6 +70,8 @@ if __name__ == "__main__":
     parser.add_option('-r', '--no_l1reg', action='store_false', dest='l1reg', default=True, help='disable L1 Regularization totally ')
     parser.add_option('-m', '--model_set', type='str', dest='model_set', default='32,12,8,6,4', help='comma separated list of which bit widths to run')
     parser.add_option('-n', '--net_efficiency', action='store_true', dest='efficiency_calc', default=False, help='Enable Per-Epoch efficiency calculation (adds train time)')
+    parser.add_option('-f', '--fold', action='store', type='int', dest='fold', default=None, help='Which fold to use as a validation fold, other folds being training set')
+    parser.add_option('-k', '--kfolds', action='store', type='int', dest='kfolds', default=4, help='K Folds, number of total folds')
     (options,args) = parser.parse_args()
     yamlConfig = parse_config(options.config)
 
@@ -155,22 +157,47 @@ if __name__ == "__main__":
 
     # Set Batch size and split value
     batch_size = 1024
-    train_split = 0.75
 
-    # Setup and split dataset
-    full_dataset = jet_dataset.ParticleJetDataset(options.inputFile,yamlConfig)
+    if options.fold is None: #No fold passed, just load a whole folder and randomly split train/test
+        train_split = 0.75
+
+        # Setup and split dataset
+        full_dataset = jet_dataset.ParticleJetDataset(options.inputFile,yamlConfig)
+
+        train_size = int(train_split * len(full_dataset))  # 25% for Validation set, 75% for train set
+
+        val_size = len(full_dataset) - train_size
+
+
+        num_val_batches = math.ceil(val_size/batch_size)
+        num_train_batches = math.ceil(train_size/batch_size)
+        print("train_batches " + str(num_train_batches))
+        print("val_batches " + str(num_val_batches))
+
+        train_dataset, val_dataset = torch.utils.data.random_split(full_dataset,[train_size,val_size])
+    else:
+        train_filenames = []
+        val_filename = ""
+        for i in range(1, options.kfolds+1):
+            if i is not options.fold:
+                train_filenames.append("jetImage_kfold_{}.h5".format(i))
+            else:
+                val_filename = "jetImage_kfold_{}.h5".format(i)
+        print("K Fold Train Dataset:")
+        train_dataset = jet_dataset.ParticleJetDataset(options.inputFile, yamlConfig, filenames=train_filenames)
+        print("K Fold Val Dataset:")
+        val_dataset = jet_dataset.ParticleJetDataset(options.inputFile, yamlConfig, filenames=[val_filename])
+
+        train_size = int(len(train_dataset))  # 25% for Validation set, 75% for train set
+        val_size = int(len(val_dataset))
+
+        num_val_batches = math.ceil(val_size / batch_size)
+        num_train_batches = math.ceil(train_size / batch_size)
+        print("train_batches " + str(num_train_batches))
+        print("val_batches " + str(num_val_batches))
+
     test_dataset = jet_dataset.ParticleJetDataset(options.test, yamlConfig)
-    train_size = int(train_split * len(full_dataset))  # 25% for Validation set, 75% for train set
-
-    val_size = len(full_dataset) - train_size
     test_size = len(test_dataset)
-
-    num_val_batches = math.ceil(val_size/batch_size)
-    num_train_batches = math.ceil(train_size/batch_size)
-    print("train_batches " + str(num_train_batches))
-    print("val_batches " + str(num_val_batches))
-
-    train_dataset, val_dataset = torch.utils.data.random_split(full_dataset,[train_size,val_size])
 
     print("train dataset size: " + str(len(train_dataset)))
     print("validation dataset size: " + str(len(val_dataset)))
@@ -272,8 +299,8 @@ if __name__ == "__main__":
                 print('[epoch %d] val batch loss: %.7f' % (epoch + 1, valid_loss))
                 print('[epoch %d] val ROC AUC Score: %.7f' % (epoch + 1, val_roc_auc_score))
                 print('[epoch %d] val Avg Precision Score: %.7f' % (epoch + 1, val_avg_precision))
-                print('[epoch %d] aIQ Calc Time: %.7f seconds' % (epoch + 1, aiq_time))
                 if options.efficiency_calc:
+                    print('[epoch %d] aIQ Calc Time: %.7f seconds' % (epoch + 1, aiq_time))
                     print('[epoch %d] Model Efficiency: %.7f' % (epoch + 1, epoch_eff))
                     for layer in aiq_dict["layer_metrics"]:
                         print('[epoch %d]\t Layer %s Efficiency: %.7f' % (epoch + 1, layer, aiq_dict['layer_metrics'][layer]['efficiency']))
