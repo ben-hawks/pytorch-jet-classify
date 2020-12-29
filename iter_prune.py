@@ -465,7 +465,7 @@ if __name__ == "__main__":
         base_roc_set = [[base_params, base_roc_score],
                         [base_quant_params, base_quant_roc_score]]
     # Plot metrics
-    plot_total_loss(model_set, model_totalloss_set, model_estop_set)
-    plot_total_eff(model_set,model_eff_set,model_estop_set)
-    plot_metric_vs_bitparam(model_set,prune_result_set,bit_params_set,base_acc_set,metric_text='ACC')
-    plot_metric_vs_bitparam(model_set, prune_result_set, bit_params_set, base_roc_set, metric_text='ROC')
+    plot_total_loss(model_set, model_totalloss_set, model_estop_set, outputDir=options.outputDir)
+    plot_total_eff(model_set,model_eff_set,model_estop_set, outputDir=options.outputDir)
+    plot_metric_vs_bitparam(model_set,prune_result_set,bit_params_set,base_acc_set,metric_text='ACC',outputDir=options.outputDir)
+    plot_metric_vs_bitparam(model_set, prune_result_set, bit_params_set, base_roc_set, metric_text='ROC',outputDir=options.outputDir)
