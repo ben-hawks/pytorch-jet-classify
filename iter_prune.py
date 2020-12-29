@@ -70,8 +70,8 @@ if __name__ == "__main__":
     parser.add_option('-r', '--no_l1reg', action='store_false', dest='l1reg', default=True, help='disable L1 Regularization totally ')
     parser.add_option('-m', '--model_set', type='str', dest='model_set', default='32,12,8,6,4', help='comma separated list of which bit widths to run')
     parser.add_option('-n', '--net_efficiency', action='store_true', dest='efficiency_calc', default=False, help='Enable Per-Epoch efficiency calculation (adds train time)')
-    parser.add_option('-f', '--fold', action='store', type='int', dest='fold', default=None, help='Which fold to use as a validation fold, other folds being training set')
-    parser.add_option('-k', '--kfolds', action='store', type='int', dest='kfolds', default=4, help='K Folds, number of total folds')
+    parser.add_option('-k', '--kfold', action='store', type='int', dest='fold', default=None, help='Which fold to use as a validation fold, other folds being training set')
+    parser.add_option('-f', '--folds', action='store', type='int', dest='kfolds', default=4, help='K Folds, number of total folds')
     (options,args) = parser.parse_args()
     yamlConfig = parse_config(options.config)
 
