@@ -260,6 +260,7 @@ if __name__ == "__main__":
                 print("Resetting Model to Inital State dict with masks applied. Verifying via param count.\n\n")
                 model.load_state_dict(init_sd)
                 model.update_masks(prune_mask)
+                model.to(device)
                 model.mask_to_device(device)
                 model.force_mask_apply()
                 countNonZeroWeights(model)
