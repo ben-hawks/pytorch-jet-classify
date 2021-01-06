@@ -18,9 +18,9 @@ spec:
         - -t
         - /ptjetclassvol/train_data/test/
         - -i
-        - ptjetclassvol/train_output/kfold/val_$K/FT_$RAND/models/
+        - /ptjetclassvol/train_output/kfold/val_$K/FT_$RAND/models/
         - -o
-        - ptjetclassvol/train_output/kfold/val_$K/FT_$RAND/aiq_plots/
+        - /ptjetclassvol/train_output/kfold/val_$K/FT_$RAND/aiq_plots/
         - -n
         - "FT_$RAND_K$K"
         volumeMounts:
