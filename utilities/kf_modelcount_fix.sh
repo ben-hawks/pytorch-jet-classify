@@ -13,13 +13,13 @@ do
   do
     for p in "${prec[@]}"
     do
-		(cd /ptjetclassvol/train_output/kfold/val_"$k"/FT_"$i"/models/"p"b && mkdir ./old/ &&
+		(cd /ptjetclassvol/train_output/kfold/val_"$k"/FT_"$i"/models/"$p"b && mkdir ./old/ &&
 	ls -tp | grep -v '/$' | tail -n +13 | xargs -I {} mv -- {} ./old/)
-		(cd /ptjetclassvol/train_output/kfold/val_"$k"/FT_"$i"_NoBN/models/"p"b && mkdir ./old/ &&
+		(cd /ptjetclassvol/train_output/kfold/val_"$k"/FT_"$i"_NoBN/models/"$p"b && mkdir ./old/ &&
 	ls -tp | grep -v '/$' | tail -n +13 | xargs -I {} mv -- {} ./old/)
-		(cd /ptjetclassvol/train_output/kfold/val_"$k"/FT_"$i"_NoL1/models/"p"b && mkdir ./old/ &&
+		(cd /ptjetclassvol/train_output/kfold/val_"$k"/FT_"$i"_NoL1/models/"$p"b && mkdir ./old/ &&
 	ls -tp | grep -v '/$' | tail -n +13 | xargs -I {} mv -- {} ./old/)
-		(cd /ptjetclassvol/train_output/kfold/val_"$k"/LT_"$i"/models/"p"b && mkdir ./old/ &&
+		(cd /ptjetclassvol/train_output/kfold/val_"$k"/LT_"$i"/models/"$p"b && mkdir ./old/ &&
 	ls -tp | grep -v '/$' | tail -n +13 | xargs -I {} mv -- {} ./old/)
 	done
   done
