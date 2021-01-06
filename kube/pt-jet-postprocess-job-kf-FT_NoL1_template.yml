@@ -1,0 +1,58 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pt-jet-postprocess-job-ft-nol1-$RAND
+  labels:
+    jobgroup: pt-jet-postprocess-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: jet-iter-prune
+        image:  gitlab-registry.nautilus.optiputer.net/jmduarte/pytorch-jet-classify:latest
+        terminationMessagePolicy: FallbackToLogsOnError
+        command:
+        - "python"
+        args:
+        - /opt/repo/pytorch-jet-classify/post_training_metrics.py
+        - -t
+        - /ptjetclassvol/train_data/test/
+        - -i
+        - /ptjetclassvol/train_output/kfold/val_$K/FT_$RAND_NoL1/models/
+        - -o
+        - /ptjetclassvol/train_output/kfold/val_$K/FT_$RAND_NoL1/aiq_plots/
+        - -n
+        - "FT_$RAND_NoL1_K$K"
+        volumeMounts:
+        - mountPath: /ptjetclassvol
+          name: pt-jet-class-vol
+        - name: git-repo
+          mountPath: /opt/repo
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "4"
+          requests:
+            memory: 2Gi
+            cpu: "1"
+      initContainers:
+      - name: init-clone-repo
+        image: alpine/git
+        args:
+          - clone
+          - --single-branch
+          - https://github.com/ben-hawks/pytorch-jet-classify
+          - -b
+          - master
+          - /opt/repo/pytorch-jet-classify
+        volumeMounts:
+          - name: git-repo
+            mountPath: /opt/repo
+      volumes:
+      - name: git-repo
+        emptyDir: {}
+      - name: pt-jet-class-vol
+        persistentVolumeClaim:
+          claimName: pt-jet-class-vol
+      restartPolicy: Never
+  backoffLimit: 5

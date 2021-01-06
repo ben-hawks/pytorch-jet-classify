@@ -3,6 +3,7 @@
 # Expand the template into multiple files, one for each item to be processed.
 mkdir -p ./jobs
 mkdir -p ./jobs/KF
+mkdir -p ./jobs/KF/post_jobs
 prec=(32 12 6 4) #8
 kfolds=(1 2 3 4)
 rand=(0 50 75 90)
@@ -17,6 +18,15 @@ do
       cat pt-jet-class-job-kf-FT_NoBN_template.yml | sed "s/\$K/$k/" | sed "s/\$RAND/$i/" | sed "s/\$PREC/$p/" > ./jobs/KF/pt-jet-class-job-kf-FT_NoBN-K"$k"-"$i"-"$p".yaml
       cat pt-jet-class-job-kf-FT_NoL1_template.yml | sed "s/\$K/$k/" | sed "s/\$RAND/$i/" | sed "s/\$PREC/$p/" > ./jobs/KF/pt-jet-class-job-kf-FT_NoL1-K"$k"-"$i"-"$p".yaml
     done
+  done
+  mkdir -p ./post_jobs
+
+  for i in "${rand[@]}"
+  do
+    cat pt-jet-postprocess-job-kf-FT_template.yml | sed "s/\$K/$k/" | sed "s/\$RAND/$i/" > ./jobs/KF/post_jobs/pt-jet-postprocess-job-FT-K"$k"-"$i".yaml
+    cat pt-jet-postprocess-job-kf-LT_template.yml | sed "s/\$K/$k/" | sed "s/\$RAND/$i/" > ./jobs/KF/post_jobs/pt-jet-postprocess-job-LT-K"$k"-"$i".yaml
+    cat pt-jet-postprocess-job-kf-FT_NoBN_template.yml | sed "s/\$K/$k/" | sed "s/\$RAND/$i/" > ./jobs/KF/post_jobs/pt-jet-postprocess-job-FT_NoBN-K"$k"-"$i".yaml
+    cat pt-jet-postprocess-job-kf-FT_NoL1_template.yml | sed "s/\$K/$k/" | sed "s/\$RAND/$i/" > ./jobs/KF/post_jobs/pt-jet-postprocess-job-FT_NoL1-K"$k"-"$i".yaml
   done
 done
 
