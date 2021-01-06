@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pt-jet-postprocess-job-ft-nol1-$RAND
+  name: pt-jet-postprocess-job-ft-nol1-$RAND-k$K
   labels:
     jobgroup: pt-jet-postprocess-job
 spec:
