@@ -24,22 +24,28 @@ import jet_dataset
 from tools.parse_yaml_config import parse_config
 from training.train_funcs import train, val
 from training.early_stopping import EarlyStopping
-
+from tools.aiq import calc_AiQ
+from tools.param_count import calc_BOPS
 tested_sizes = []
 
 
-def create_model(parameterization):
+def create_model(parameterization, post=False):
+    #print(parameterization)
     dims = [parameterization['fc1s'], parameterization['fc2s'], parameterization['fc3s']]
-    tested_sizes.append(dims)
+    if not post:
+        tested_sizes.append(parameterization)
     prune_masks = {
         "fc1": torch.ones(dims[0], 16),
         "fc2": torch.ones(dims[1], dims[0]),
         "fc3": torch.ones(dims[2], dims[1]),
         "fc4": torch.ones(5, dims[2])}
     print("Creating model with the following dims:{}".format(dims))
-    model = models.three_layer_model_bv_tunable(prune_masks, dims, precision=options.bits)
+    if options.bits is not 32:
+        model = models.three_layer_model_bv_tunable(prune_masks, dims, precision=options.bits)
+    else:
+        model = models.three_layer_model_tunable(prune_masks, dims) # 32b, non quantized model
 
-    return model
+    return model, prune_masks
 
 def run_train(model,train_loader,val_loader):
 
@@ -48,7 +54,7 @@ def run_train(model,train_loader,val_loader):
 
     L1_factor = 0.0001  # Default Keras L1 Loss
 
-    early_stopping = EarlyStopping(patience=options.patience, verbose=True)
+    #early_stopping = EarlyStopping(patience=options.patience, verbose=True)
 
     valid_losses = []
     train_losses_epoch = []
@@ -87,24 +93,24 @@ def run_train(model,train_loader,val_loader):
         train_losses_epoch.append(train_loss.tolist())
 
         # Check if we need to early stop
-        early_stopping(valid_loss, model)
-        if early_stopping.early_stop:
-            print("Early stopping")
-            estop = epoch-10
-            break
-        else:
-            estop = epoch
+        #early_stopping(valid_loss, model)
+        #if early_stopping.early_stop:
+        #    print("Early stopping")
+        #    estop = epoch-10
+        #    break
+        #else:
+        #    estop = epoch
 
     # Load last/best checkpoint model saved via earlystopping
-    model.load_state_dict(torch.load('checkpoint.pt'))
+    #model.load_state_dict(torch.load('checkpoint.pt'))
     # Time for filenames
     now = datetime.now()
     time = now.strftime("%d-%m-%Y_%H-%M-%S")
     if not path.exists('{}b'.format(os.path.join(options.outputDir, str(options.bits)))):
         os.makedirs('{}b'.format(os.path.join(options.outputDir,  str(options.bits))))
-    filename = "{}b/BO_{}b_JetModel_{}-{}-{}_{}.pth".format(os.path.join(options.outputDir,  str(options.bits)), options.bits, model.dims[0], model.dims[1], model.dims[2],time)
-    print("saving model to {}".format(filename))
-    torch.save(model.state_dict(),filename)
+    #filename = "{}b/BO_{}b_JetModel_{}-{}-{}_{}.pth".format(os.path.join(options.outputDir,  str(options.bits)), options.bits, model.dims[0], model.dims[1], model.dims[2],time)
+    #print("saving model to {}".format(filename))
+    #torch.save(model.state_dict(),filename)
 
     # Plot & save losses for this iteration
     loss_plt = plt.figure()
@@ -136,6 +142,30 @@ def run_train(model,train_loader,val_loader):
 
     return model
 
+def evaluate(model, val_loader, L1_factor=0.0001):
+    test_loss_value_list = []
+    test_criterion = nn.BCELoss()
+    model.to(device)
+    model.mask_to_device(device)
+    with torch.no_grad():  # Evaulate pruned model performance
+        for i, data in enumerate(test_loader):
+            model.eval()
+            local_batch, local_labels = data
+            local_batch, local_labels = local_batch.to(device), local_labels.to(device)
+            outputs = model(local_batch.float())
+            criterion_loss = test_criterion(outputs, local_labels.float())
+            reg_loss = 0  # l1_regularizer(model, lambda_l1=L1_factor)
+            test_loss = criterion_loss + reg_loss
+        test_loss_value_list.append(test_loss)
+        try:
+            loss = np.average(test_loss_value_list)
+        except:
+            loss = torch.mean(torch.stack(test_loss_value_list)).cpu().numpy()
+
+    # add test loss to our loss dict to make plotting stuff easier, we calc other perf metrics later
+    model_loss_dict['{}-{}-{}'.format(model.dims[0], model.dims[1],model.dims[2])].append(loss.tolist())
+    print("Loss on test set for model: {}".format(loss))
+    return loss #accuracy
 
 def test(model, test_loader, L1_factor=0.0001):
     #predlist = torch.zeros(0, dtype=torch.long, device='cpu')
@@ -170,16 +200,177 @@ def test(model, test_loader, L1_factor=0.0001):
     return loss #accuracy
 
 def create_train_eval(parameterization):
-    model = create_model(parameterization)
+    model, _ = create_model(parameterization)
 
     trained_model = run_train(model,train_loader,validate_loader)
 
-    eval_loss = test(trained_model,test_loader)
+    eval_loss = evaluate(trained_model,validate_loader)
 
     print("eval return dtype: {}".format(type(eval_loss)))
 
     return float(eval_loss)
 
+
+def post_bo_train(dims,train_loader,val_loader,test_loader,best=False):
+    val_losses = []
+    train_losses = []
+    roc_auc_scores = []
+    avg_precision_scores = []
+    avg_train_losses = []
+    avg_valid_losses = []
+    accuracy_scores = []
+    iter_eff = []
+
+    early_stopping = EarlyStopping(patience=options.patience, verbose=True)
+    # dims = {'fc1':dims[0],'fc2':dims[1],'fc3':dims[2]}
+    model, prune_mask = create_model(dims, post=True)
+    dims_str = str([dims['fc1s'], dims['fc2s'], dims['fc3s']])
+    model.update_masks(prune_mask)  # Make sure to update the masks within the model
+
+    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    criterion = nn.BCELoss()
+
+    L1_factor = 0.0001  # Default Keras L1 Loss
+    estop = False
+    epoch_counter = 0
+
+    model.to(device)
+    model.mask_to_device(device)
+
+    print("~~~~~~~~~~~~~~~~~Starting Post BO Training for Model Size {}~~~~~~~~~~~~~~~~~~~~".format(dims))
+
+    if options.efficiency_calc and epoch_counter == 0:  # Get efficiency of un-initalized model
+        aiq_dict, aiq_time = calc_AiQ(model, test_loader, True, device=device)
+        epoch_eff = aiq_dict['net_efficiency']
+        iter_eff.append(aiq_dict)
+        print('[epoch 0] Model Efficiency: %.7f' % epoch_eff)
+        for layer in aiq_dict["layer_metrics"]:
+            print('[epoch 0]\t Layer %s Efficiency: %.7f' % (layer, aiq_dict['layer_metrics'][layer]['efficiency']))
+
+    for epoch in range(options.epochs):  # loop over the dataset multiple times
+        epoch_counter += 1
+        # Train
+        model, train_losses = train(model, optimizer, criterion, train_loader, L1_factor=L1_factor)
+
+        # Validate
+        val_losses, val_avg_precision_list, val_roc_auc_scores_list = val(model, criterion, val_loader,
+                                                                          L1_factor=L1_factor)
+
+        # Calculate average epoch statistics
+        try:
+            train_loss = np.average(train_losses)
+        except:
+            train_loss = torch.mean(torch.stack(train_losses)).cpu().numpy()
+
+        try:
+            valid_loss = np.average(val_losses)
+        except:
+            valid_loss = torch.mean(torch.stack(val_losses)).cpu().numpy()
+
+        val_roc_auc_score = np.average(val_roc_auc_scores_list)
+        val_avg_precision = np.average(val_avg_precision_list)
+
+        if options.efficiency_calc:
+            aiq_dict, aiq_time = calc_AiQ(model, test_loader, True, device=device)
+            epoch_eff = aiq_dict['net_efficiency']
+            iter_eff.append(aiq_dict)
+
+        avg_train_losses.append(train_loss.tolist())
+        avg_valid_losses.append(valid_loss.tolist())
+        avg_precision_scores.append(val_avg_precision)
+
+        # Print epoch statistics
+        print('[epoch %d] train batch loss: %.7f' % (epoch + 1, train_loss))
+        print('[epoch %d] val batch loss: %.7f' % (epoch + 1, valid_loss))
+        print('[epoch %d] val ROC AUC Score: %.7f' % (epoch + 1, val_roc_auc_score))
+        print('[epoch %d] val Avg Precision Score: %.7f' % (epoch + 1, val_avg_precision))
+        if options.efficiency_calc:
+            print('[epoch %d] Model Efficiency: %.7f' % (epoch + 1, epoch_eff))
+            print('[epoch %d] aIQ Calc Time: %.7f seconds' % (epoch + 1, aiq_time))
+            for layer in aiq_dict["layer_metrics"]:
+                print('[epoch %d]\t Layer %s Efficiency: %.7f' % (
+                epoch + 1, layer, aiq_dict['layer_metrics'][layer]['efficiency']))
+        # Check if we need to early stop
+        early_stopping(valid_loss, model)
+        if early_stopping.early_stop:
+            print("Early stopping")
+            estop = True
+            epoch_counter -= options.patience
+            break
+
+        # Load last/best checkpoint model saved via earlystopping
+    model.load_state_dict(torch.load('checkpoint.pt'))
+
+    # Time for plots
+    now = datetime.now()
+    time = now.strftime("%d-%m-%Y_%H-%M-%S")
+
+    # Plot & save losses for this iteration
+    loss_plt = plt.figure()
+    loss_ax = loss_plt.add_subplot()
+
+    loss_ax.plot(range(1, len(avg_train_losses) + 1), avg_train_losses, label='Training Loss')
+    loss_ax.plot(range(1, len(avg_valid_losses) + 1), avg_valid_losses, label='Validation Loss')
+
+    # find position of lowest validation loss
+    if estop:
+        minposs = avg_valid_losses.index(min(avg_valid_losses))
+    else:
+        minposs = options.epochs
+
+
+    # update our epoch counter to represent where the model actually stopped training
+    epoch_counter -= ((len(avg_valid_losses)) - minposs)
+
+    nbits = model.weight_precision if hasattr(model, 'weight_precision') else 32
+    # Plot losses for this iter
+
+    loss_ax.axvline(minposs, linestyle='--', color='r', label='Early Stopping Checkpoint')
+    loss_ax.set_xlabel('epochs')
+    loss_ax.set_ylabel('loss')
+    loss_ax.grid(True)
+    loss_ax.legend()
+    filename = 'loss_plot_{}b_e{}_{}_.png'.format(nbits, epoch_counter, str(dims_str))
+    loss_ax.set_title('Loss from epoch 1 to {}, {}b model'.format(epoch_counter, nbits))
+    loss_plt.savefig(path.join(options.outputDir, filename), bbox_inches='tight')
+    loss_plt.show()
+    plt.close(loss_plt)
+    if options.efficiency_calc:
+        # Plot & save eff for this iteration
+        loss_plt = plt.figure()
+        loss_ax = loss_plt.add_subplot()
+        loss_ax.set_title('Net Eff. from epoch 0 to {}, {}b {} model'.format(epoch_counter, nbits, dims_str))
+        loss_ax.plot(range(0, len(iter_eff)), [z['net_efficiency'] for z in iter_eff],
+                     label='Net Efficiency', color='green')
+
+        # loss_ax.plot(range(1, len(iter_eff) + 1), [z["layer_metrics"][layer]['efficiency'] for z in iter_eff])
+        loss_ax.axvline(minposs, linestyle='--', color='r', label='Early Stopping Checkpoint')
+        loss_ax.set_xlabel('epochs')
+        loss_ax.set_ylabel('Net Efficiency')
+        loss_ax.grid(True)
+        loss_ax.legend()
+        filename = 'eff_plot_{}b_e{}_{}_.png'.format(nbits, epoch_counter, dims_str)
+        loss_plt.savefig(path.join(options.outputDir, filename), bbox_inches='tight')
+        loss_plt.show()
+        plt.close(loss_plt)
+
+    model_filename = "BO_{}b_{}.pth".format(nbits,dims_str)
+    model_filename2 = "BO_{}b_{}_full.pth".format(nbits, dims_str)
+    os.makedirs(path.join(options.outputDir,"full_models"), exist_ok=True)
+    torch.save(model.state_dict(), path.join(options.outputDir, model_filename))
+    #torch.save(model,path.join(options.outputDir,"full_models", model_filename2))
+
+    final_aiq = calc_AiQ(model, test_loader, batnorm=True, device=device, full_results=True, testlabels=test_dataset.labels_list)
+
+    model_totalloss_json_dict = {options.bits: [[avg_train_losses,avg_valid_losses], iter_eff, [minposs]]}
+
+    filename = 'model_losses_{}_{}.json'.format(options.bits,dims_str)
+    with open(path.join(options.outputDir, filename), 'w') as fp:
+        json.dump(model_totalloss_json_dict, fp)
+    final_aiq.update({'dims': str(dims_str), 'best':best})
+    aiq_entry ={int(calc_BOPS(model, options.bits)): final_aiq}
+
+    return aiq_entry
 
 if __name__ == '__main__':
     parser = OptionParser()
@@ -188,10 +379,12 @@ if __name__ == '__main__':
     parser.add_option('-t','--test'   ,action='store',type='string',dest='test'   ,default='', help='Location of test data set')
     parser.add_option('-l','--load', action='store', type='string', dest='modelLoad', default=None, help='Model to load instead of training new')
     parser.add_option('-c','--config'   ,action='store',type='string',dest='config'   ,default='configs/train_config_threelayer.yml', help='tree name')
-    parser.add_option('-e','--epochs'   ,action='store',type='int', dest='epochs', default=100, help='number of epochs to train for')
+    parser.add_option('-e','--epochs'   ,action='store',type='int', dest='epochs', default=250, help='number of epochs to train for')
+    parser.add_option('-s', '--search_epochs', action='store', type='int', dest='epochs', default=50, help='number of epochs to run during BO for')
     parser.add_option('-p', '--patience', action='store', type='int', dest='patience', default=10,help='Early Stopping patience in epochs')
     parser.add_option('-b', '--bits', action='store', type='int', dest='bits', default=8, help='Bits of precision to quantize model to')
     parser.add_option('-n', '--trials', action='store', type='int', dest='trials', default=20, help='Number of trials to perform')
+    parser.add_option('-q', '--net_efficiency', action='store_true', dest='efficiency_calc', default=False, help='Enable Per-Epoch efficiency calculation in post BO training(adds train time)')
     (options,args) = parser.parse_args()
     yamlConfig = parse_config(options.config)
 
@@ -275,3 +468,22 @@ if __name__ == '__main__':
     results_file.write("Means: {}\n".format(means))
     results_file.write("Covariances: {}\n".format(covariances))
     print("Results saved to {}".format(result_filename))
+
+    aiq_results = {}
+    for size in tested_sizes:
+        print("Size: {}".format(size))
+        if size == best_parameters:
+            model_perf = post_bo_train(size,train_loader,validate_loader,test_loader, best=True)
+        else:
+            model_perf = post_bo_train(size,train_loader,validate_loader,test_loader, best=False)
+        aiq_results.update(model_perf)
+
+    if best_parameters not in tested_sizes:
+        model_perf = post_bo_train(best_parameters,train_loader,validate_loader,test_loader, best=True)
+        aiq_results.update(model_perf)
+    aiq_results = {k: aiq_results[k] for k in sorted(aiq_results)}
+    aiq_dict =  {'{}b'.format(options.bits): aiq_results}
+
+    filename = 'model_AIQ_{}.json'.format(options.bits)
+    with open(path.join(options.outputDir, filename), 'w') as fp:
+        json.dump(aiq_dict, fp)

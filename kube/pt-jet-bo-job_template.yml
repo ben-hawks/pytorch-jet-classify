@@ -23,8 +23,10 @@ spec:
         - /opt/repo/pytorch-jet-classify/configs/train_config_threelayer.yml
         - -e
         - "250"
+        - -s
+        - "25"
         - -o
-        - /ptjetclassvol/BO_output/
+        - /ptjetclassvol/BO_output_redo/$PREC/
         - -b
         - "$PREC"
         volumeMounts:
