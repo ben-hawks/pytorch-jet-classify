@@ -60,7 +60,7 @@ def run_train(model,train_loader,val_loader):
     train_losses_epoch = []
     estop = 0
 
-    for epoch in range(options.epochs):  # loop over the dataset multiple times
+    for epoch in range(options.search_epochs):  # loop over the dataset multiple times
         # Train
         model, train_losses = train(model, optimizer, criterion, train_loader,
                                     L1_factor=L1_factor, device=device, l1reg=True)
@@ -380,7 +380,7 @@ if __name__ == '__main__':
     parser.add_option('-l','--load', action='store', type='string', dest='modelLoad', default=None, help='Model to load instead of training new')
     parser.add_option('-c','--config'   ,action='store',type='string',dest='config'   ,default='configs/train_config_threelayer.yml', help='tree name')
     parser.add_option('-e','--epochs'   ,action='store',type='int', dest='epochs', default=250, help='number of epochs to train for')
-    parser.add_option('-s', '--search_epochs', action='store', type='int', dest='epochs', default=50, help='number of epochs to run during BO for')
+    parser.add_option('-s', '--search_epochs', action='store', type='int', dest='search_epochs', default=50, help='number of epochs to run during BO for')
     parser.add_option('-p', '--patience', action='store', type='int', dest='patience', default=10,help='Early Stopping patience in epochs')
     parser.add_option('-b', '--bits', action='store', type='int', dest='bits', default=8, help='Bits of precision to quantize model to')
     parser.add_option('-n', '--trials', action='store', type='int', dest='trials', default=20, help='Number of trials to perform')
