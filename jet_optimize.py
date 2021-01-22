@@ -142,32 +142,32 @@ def run_train(model,train_loader,val_loader):
 
     return model
 
-def evaluate(model, val_loader, L1_factor=0.0001):
-    test_loss_value_list = []
+def evaluate(model, eval_loader, L1_factor=0.0001):
+    eval_loss_value_list = []
     test_criterion = nn.BCELoss()
     model.to(device)
     model.mask_to_device(device)
     with torch.no_grad():  # Evaulate pruned model performance
-        for i, data in enumerate(test_loader):
+        for i, data in enumerate(eval_loader):
             model.eval()
             local_batch, local_labels = data
             local_batch, local_labels = local_batch.to(device), local_labels.to(device)
             outputs = model(local_batch.float())
             criterion_loss = test_criterion(outputs, local_labels.float())
             reg_loss = 0  # l1_regularizer(model, lambda_l1=L1_factor)
-            test_loss = criterion_loss + reg_loss
-        test_loss_value_list.append(test_loss)
+            eval_loss = criterion_loss + reg_loss
+        eval_loss_value_list.append(eval_loss)
         try:
-            loss = np.average(test_loss_value_list)
+            loss = np.average(eval_loss_value_list)
         except:
-            loss = torch.mean(torch.stack(test_loss_value_list)).cpu().numpy()
+            loss = torch.mean(torch.stack(eval_loss_value_list)).cpu().numpy()
 
     # add test loss to our loss dict to make plotting stuff easier, we calc other perf metrics later
     model_loss_dict['{}-{}-{}'.format(model.dims[0], model.dims[1],model.dims[2])].append(loss.tolist())
-    print("Loss on test set for model: {}".format(loss))
+    print("Loss on eval set for model: {}".format(loss))
     return loss #accuracy
 
-def test(model, test_loader, L1_factor=0.0001):
+def test(model, eval_loader, L1_factor=0.0001):
     #predlist = torch.zeros(0, dtype=torch.long, device='cpu')
     #lbllist = torch.zeros(0, dtype=torch.long, device='cpu')
     test_loss_value_list = []
@@ -175,7 +175,7 @@ def test(model, test_loader, L1_factor=0.0001):
     model.to(device)
     model.mask_to_device(device)
     with torch.no_grad():  # Evaulate pruned model performance
-        for i, data in enumerate(test_loader):
+        for i, data in enumerate(eval_loader):
             model.eval()
             local_batch, local_labels = data
             local_batch, local_labels = local_batch.to(device), local_labels.to(device)
@@ -211,7 +211,7 @@ def create_train_eval(parameterization):
     return float(eval_loss)
 
 
-def post_bo_train(dims,train_loader,val_loader,test_loader,best=False):
+def post_bo_train(dims,train_loader,val_loader,eval_loader,best=False):
     val_losses = []
     train_losses = []
     roc_auc_scores = []
@@ -240,7 +240,7 @@ def post_bo_train(dims,train_loader,val_loader,test_loader,best=False):
     print("~~~~~~~~~~~~~~~~~Starting Post BO Training for Model Size {}~~~~~~~~~~~~~~~~~~~~".format(dims))
 
     if options.efficiency_calc and epoch_counter == 0:  # Get efficiency of un-initalized model
-        aiq_dict, aiq_time = calc_AiQ(model, test_loader, True, device=device)
+        aiq_dict, aiq_time = calc_AiQ(model, eval_loader, True, device=device)
         epoch_eff = aiq_dict['net_efficiency']
         iter_eff.append(aiq_dict)
         print('[epoch 0] Model Efficiency: %.7f' % epoch_eff)
@@ -271,7 +271,7 @@ def post_bo_train(dims,train_loader,val_loader,test_loader,best=False):
         val_avg_precision = np.average(val_avg_precision_list)
 
         if options.efficiency_calc:
-            aiq_dict, aiq_time = calc_AiQ(model, test_loader, True, device=device)
+            aiq_dict, aiq_time = calc_AiQ(model, eval_loader, True, device=device)
             epoch_eff = aiq_dict['net_efficiency']
             iter_eff.append(aiq_dict)
 
@@ -360,7 +360,7 @@ def post_bo_train(dims,train_loader,val_loader,test_loader,best=False):
     torch.save(model.state_dict(), path.join(options.outputDir, model_filename))
     #torch.save(model,path.join(options.outputDir,"full_models", model_filename2))
 
-    final_aiq = calc_AiQ(model, test_loader, batnorm=True, device=device, full_results=True, testlabels=test_dataset.labels_list)
+    final_aiq = calc_AiQ(model, eval_loader, batnorm=True, device=device, full_results=True, testlabels=test_dataset.labels_list)
 
     model_totalloss_json_dict = {options.bits: [[avg_train_losses,avg_valid_losses], iter_eff, [minposs]]}
 
