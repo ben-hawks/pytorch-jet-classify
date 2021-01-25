@@ -26,7 +26,7 @@ def create_model(parameterization, bits):
         try:
             dims = [parameterization[0], parameterization[1], parameterization[2]]
         except Exception as e:
-            print("Warning! Malformed node size array: {}".format(dims))
+            print("Warning! Malformed node size array: {}".format(parameterization))
             print("Caught Exception: {}".format(e))
 
     prune_mask = {
