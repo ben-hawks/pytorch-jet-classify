@@ -8,10 +8,10 @@ mkdir -p ./jobs/BN
 mkdir -p ./jobs/NoBN
 mkdir -p ./jobs/NoL1
 mkdir -p ./jobs/BO
-prec=(32 12 6 4)
-bo_best=("64,28,27" "64,32,19" "54,32,32" "44,32,32") #Probably a 'nicer' way of loading these, its fine for this scope
-rand=(0 25 50 75 90 100)
-for p in "${prec[@]}" #8
+prec=(32 12 6 4) # 8
+bo_best=("46,10,17" "61,7,23" "32,11,21" "56,19,31") #Probably a 'nicer' way of loading these, its fine for this scope
+rand=(0 50 75 90) # 25 100
+for p in "${prec[@]}"
 do
   for i in "${rand[@]}"
   do
