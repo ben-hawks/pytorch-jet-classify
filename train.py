@@ -26,7 +26,7 @@ def create_model(parameterization, bits):
         try:
             dims = [parameterization[0], parameterization[1], parameterization[2]]
         except Exception as e:
-            print("Warning! Malformed mode size array: {}".format(dims))
+            print("Warning! Malformed node size array: {}".format(dims))
             print("Caught Exception: {}".format(e))
 
     prune_mask = {
@@ -35,7 +35,11 @@ def create_model(parameterization, bits):
         "fc3": torch.ones(dims[2], dims[1]),
         "fc4": torch.ones(5, dims[2])}
     print("Creating model with the following dims:{}".format(dims))
-    model = models.three_layer_model_bv_tunable(prune_mask, dims, precision=bits)
+
+    if bits is not 32:
+        model = models.three_layer_model_bv_tunable(prune_mask, dims, precision=bits)
+    else:
+        model = models.three_layer_model_tunable(prune_mask, dims)  # 32b, non quantized model
 
     return model, prune_mask
 
