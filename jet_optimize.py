@@ -206,7 +206,7 @@ def create_train_eval(parameterization):
 
     eval_loss = evaluate(trained_model,validate_loader)
 
-    print("eval return dtype: {}".format(type(eval_loss)))
+    #print("eval return dtype: {}".format(type(eval_loss)))
 
     return float(eval_loss)
 
