@@ -24,7 +24,7 @@ spec:
         - -e
         - "250"
         - -o
-        - /ptjetclassvol/train_output/BO_output_redo_2/rand/best_$RAND
+        - /ptjetclassvol/train_output/BO_output_redo_2/rand_redo/best_$RAND
         - -b
         - "$PREC"
         - -n
