@@ -1215,85 +1215,85 @@ if __name__ == "__main__":
 
 
 
-    with open("../results_json/rand_trials_250e/BO/BO.json", "r") as read_file:
-        BO = json.load(read_file)
+    #with open("../results_json/rand_trials_250e/BO/BO.json", "r") as read_file:
+    #    BO = json.load(read_file)
 
-    best = {'4b':[44,32,32],
-            '6b':[54,32,32],
-            '12b':[64,32,19],
-            '32b':[64,28,27]}
+    #best = {'4b':[44,32,32],
+    #        '6b':[54,32,32],
+    #        '12b':[64,32,19],
+    #        '32b':[64,28,27]}
 
-    labels_list = ['j_g', 'j_q', 'j_w', 'j_z', 'j_t']
+  #  labels_list = ['j_g', 'j_q', 'j_w', 'j_z', 'j_t']
 
 
-   # AUCROC Plot
-    for precision, color in zip(precisions, colors):
-        eff_plot = plt.figure()
-        eff_ax = eff_plot.add_subplot()
-        eff_ax.grid(True)
-        eff_ax.set_xlabel('BOPs')
-        eff_ax.set_ylabel('AUC')
-        eff_ax.set_xscale("symlog", linthresh=1e6)
-        eff_ax.set_xlim(1e4, 1e7)
-        eff_ax.set_ylim(0.45, 1)
-        #eff_ax.set_title("AUC vs BOPS - BO ({} HLS4ML Jet Tagging Model)".format(precision))
-        eff_ax.scatter([int(key) for key in BO[precision]], [z['auc_roc'] for z in BO[precision].values()],
-                    label='{}-bit'.format(precision.rstrip('b')), color=color, alpha = 0.5, s=200)  # , marker='.',markersize=10,
-        for txt, x, y in zip([str(z['dims']) for z in BO[precision].values()], [int(key) for key in BO[precision]],
-                                               [z['auc_roc'] for z in BO[precision].values()]):
-            if txt == str(best[precision]):
-                eff_ax.annotate(txt, (x, y),color='black', label='_nolegend_')
-                eff_ax.scatter(x, y, marker="*", s=200, label='Best {} ({})'.format(precision,txt), color=color, edgecolor='black' )
-        eff_ax.legend(loc='best', title="Bayesian Optimization", framealpha=0.5)
-        eff_plot.savefig('AUCROC_BO_{}.pdf'.format(precision))
-        # eff_plot.savefig('AUCROC_FT_rand{}.pdf'.format(rand))
-        eff_plot.show()
+   # # AUCROC Plot
+   #  for precision, color in zip(precisions, colors):
+   #      eff_plot = plt.figure()
+   #      eff_ax = eff_plot.add_subplot()
+   #      eff_ax.grid(True)
+   #      eff_ax.set_xlabel('BOPs')
+   #      eff_ax.set_ylabel('AUC')
+   #      eff_ax.set_xscale("symlog", linthresh=1e6)
+   #      eff_ax.set_xlim(1e4, 1e7)
+   #      eff_ax.set_ylim(0.45, 1)
+   #      #eff_ax.set_title("AUC vs BOPS - BO ({} HLS4ML Jet Tagging Model)".format(precision))
+   #      eff_ax.scatter([int(key) for key in BO[precision]], [z['auc_roc'] for z in BO[precision].values()],
+   #                  label='{}-bit'.format(precision.rstrip('b')), color=color, alpha = 0.5, s=200)  # , marker='.',markersize=10,
+   #      for txt, x, y in zip([str(z['dims']) for z in BO[precision].values()], [int(key) for key in BO[precision]],
+   #                                             [z['auc_roc'] for z in BO[precision].values()]):
+   #          if txt == str(best[precision]):
+   #              eff_ax.annotate(txt, (x, y),color='black', label='_nolegend_')
+   #              eff_ax.scatter(x, y, marker="*", s=200, label='Best {} ({})'.format(precision,txt), color=color, edgecolor='black' )
+   #      eff_ax.legend(loc='best', title="Bayesian Optimization", framealpha=0.5)
+   #      eff_plot.savefig('AUCROC_BO_{}.pdf'.format(precision))
+   #      # eff_plot.savefig('AUCROC_FT_rand{}.pdf'.format(rand))
+   #      eff_plot.show()
 
-    # Accuracy plot
-    for precision, color in zip(precisions, colors):
-        eff_plot = plt.figure()
-        eff_ax = eff_plot.add_subplot()
-        eff_ax.grid(True)
-        eff_ax.set_xlabel('BOPs')
-        eff_ax.set_ylabel('Accuracy')
-        eff_ax.set_xscale("symlog", linthresh=1e6)
-        eff_ax.set_xlim(1e4, 1e7)
-        eff_ax.set_ylim(0.6, 0.8)
-        #eff_ax.set_title("Accuracy vs BOPS - BO ({} HLS4ML Jet Tagging Model)".format(precision))
-        eff_ax.scatter([int(key) for key in BO[precision]], [z['accuracy'] for z in BO[precision].values()],
-                       label='{}-bit'.format(precision.rstrip('b')), color=color, alpha=0.5, s=200)  # , marker='.',markersize=10,
-        for txt, x, y in zip([str(z['dims']) for z in BO[precision].values()], [int(key) for key in BO[precision]],
-                                               [z['accuracy'] for z in BO[precision].values()]):
-            if txt == str(best[precision]):
-                eff_ax.annotate(txt, (x, y), color='black', label='_nolegend_')
-                eff_ax.scatter(x, y, marker="*", s=200, label='Best {} ({})'.format(precision,txt), color=color, edgecolor='black' )
-        eff_ax.legend(loc='best', title="Bayesian Optimization", framealpha=0.5)
-        eff_plot.savefig('ACC_BO_{}.pdf'.format(precision))
-        # eff_plot.savefig('ACC_FT_rand{}.pdf'.format(rand))
-        eff_plot.show()
-
-    # Efficiency plot
-    for precision, color in zip(precisions, colors):
-        eff_plot = plt.figure()
-        eff_ax = eff_plot.add_subplot()
-        eff_ax.grid(True)
-        eff_ax.set_xlabel('BOPs')
-        eff_ax.set_ylabel('Efficiency')
-        eff_ax.set_xscale("symlog", linthresh=1e6)
-        eff_ax.set_xlim(1e4, 1e7)
-        eff_ax.set_ylim(0, 0.6)
-        #eff_ax.set_title("Efficiency vs BOPS BO ({} HLS4ML Jet Tagging Model)".format(precision))
-        eff_ax.scatter([int(key) for key in BO[precision]], [z['net_efficiency'] for z in BO[precision].values()],
-                       label='{}-bit'.format(precision.rstrip('b')), color=color, alpha = 0.5, s=200)  # , marker='.',markersize=10,
-        for txt, x, y in zip([str(z['dims']) for z in BO[precision].values()], [int(key) for key in BO[precision]],
-                                               [z['net_efficiency'] for z in BO[precision].values()]):
-            if txt == str(best[precision]):
-                eff_ax.annotate(txt, (x, y),color='black', label='_nolegend_')
-                eff_ax.scatter(x, y, marker="*", s=200, label='Best {} ({})'.format(precision,txt), color=color, edgecolor='black' )
-        eff_ax.legend(loc='best', title="Bayesian Optimization", framealpha=0.5)
-        eff_plot.savefig('Eff_BO_{}.pdf'.format(precision))
-        # eff_plot.savefig('ACC_FT_rand{}.pdf'.format(rand))
-        eff_plot.show()
+ #    # Accuracy plot
+ #    for precision, color in zip(precisions, colors):
+ #        eff_plot = plt.figure()
+ #        eff_ax = eff_plot.add_subplot()
+ #        eff_ax.grid(True)
+ #        eff_ax.set_xlabel('BOPs')
+ #        eff_ax.set_ylabel('Accuracy')
+ #        eff_ax.set_xscale("symlog", linthresh=1e6)
+ #        eff_ax.set_xlim(1e4, 1e7)
+ #        eff_ax.set_ylim(0.6, 0.8)
+ #        #eff_ax.set_title("Accuracy vs BOPS - BO ({} HLS4ML Jet Tagging Model)".format(precision))
+ #        eff_ax.scatter([int(key) for key in BO[precision]], [z['accuracy'] for z in BO[precision].values()],
+ #                       label='{}-bit'.format(precision.rstrip('b')), color=color, alpha=0.5, s=200)  # , marker='.',markersize=10,
+ #        for txt, x, y in zip([str(z['dims']) for z in BO[precision].values()], [int(key) for key in BO[precision]],
+ #                                               [z['accuracy'] for z in BO[precision].values()]):
+ #            if txt == str(best[precision]):
+ #                eff_ax.annotate(txt, (x, y), color='black', label='_nolegend_')
+ #                eff_ax.scatter(x, y, marker="*", s=200, label='Best {} ({})'.format(precision,txt), color=color, edgecolor='black' )
+ #        eff_ax.legend(loc='best', title="Bayesian Optimization", framealpha=0.5)
+ #        eff_plot.savefig('ACC_BO_{}.pdf'.format(precision))
+ #        # eff_plot.savefig('ACC_FT_rand{}.pdf'.format(rand))
+ #        eff_plot.show()
+ #
+ #    # Efficiency plot
+ #    for precision, color in zip(precisions, colors):
+ #        eff_plot = plt.figure()
+ #        eff_ax = eff_plot.add_subplot()
+ #        eff_ax.grid(True)
+ #        eff_ax.set_xlabel('BOPs')
+ #        eff_ax.set_ylabel('Efficiency')
+ #        eff_ax.set_xscale("symlog", linthresh=1e6)
+ #        eff_ax.set_xlim(1e4, 1e7)
+ #        eff_ax.set_ylim(0, 0.6)
+ #        #eff_ax.set_title("Efficiency vs BOPS BO ({} HLS4ML Jet Tagging Model)".format(precision))
+ #        eff_ax.scatter([int(key) for key in BO[precision]], [z['net_efficiency'] for z in BO[precision].values()],
+ #                       label='{}-bit'.format(precision.rstrip('b')), color=color, alpha = 0.5, s=200)  # , marker='.',markersize=10,
+ #        for txt, x, y in zip([str(z['dims']) for z in BO[precision].values()], [int(key) for key in BO[precision]],
+ # #                                              [z['net_efficiency'] for z in BO[precision].values()]):
+#            if txt == str(best[precision]):
+#                eff_ax.annotate(txt, (x, y),color='black', label='_nolegend_')
+#                eff_ax.scatter(x, y, marker="*", s=200, label='Best {} ({})'.format(precision,txt), color=color, edgecolor='black' )
+#        eff_ax.legend(loc='best', title="Bayesian Optimization", framealpha=0.5)
+#        eff_plot.savefig('Eff_BO_{}.pdf'.format(precision))
+#        # eff_plot.savefig('ACC_FT_rand{}.pdf'.format(rand))
+#        eff_plot.show()
 
 
 
