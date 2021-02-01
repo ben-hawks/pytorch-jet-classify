@@ -435,9 +435,9 @@ if __name__ == '__main__':
 
     best_parameters, values, experiment, model = ax.optimize(
         parameters=[
-            {"name": "fc1s", "type": "range", "bounds": [8, 64]},
-            {"name": "fc2s", "type": "range", "bounds": [4, 32]},
-            {"name": "fc3s", "type": "range", "bounds": [4, 32]}
+            {"name": "fc1s", "type": "range", "bounds": [8, 128]}, # [8, 64]
+            {"name": "fc2s", "type": "range", "bounds": [4, 64]}, # [4, 32]
+            {"name": "fc3s", "type": "range", "bounds": [4, 64]}  # [4, 32]
         ],
         evaluation_function=create_train_eval,
         minimize=True,  # minimize since objective is loss
