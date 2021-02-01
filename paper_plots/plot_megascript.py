@@ -138,14 +138,7 @@ def gen_mean_err_set(path_str):
 
 def randwise_plots(datasets, filename="FT", legendtitle="Fine Tuning Pruning",
                    rand_percent=rand_vals):
-    with open("results_json/rand_trials_250e/BO/BO.json", "r") as read_file:
-        BO = json.load(read_file)
 
-    best = {'4b': [0,0,0],  # [44, 32, 32],
-            '6b': [0,0,0],  # [54, 32, 32],
-            '12b': [0,0,0],  # [64, 32, 19],
-            '32b': [0,0,0]  # [64, 28, 27]
-    }
     labels_list = ['j_g', 'j_q', 'j_w', 'j_z', 'j_t']
     for FT, rand in zip(datasets, rand_percent):
 
@@ -273,6 +266,7 @@ def randwise_plots(datasets, filename="FT", legendtitle="Fine Tuning Pruning",
         eff_ax.set_ylim(0.45, 1)
 
         for FT, rand, color in zip(datasets, rand_percent, colors):
+            print(BO_best[rand][width])
             eff_ax.errorbar([int(key) for key in FT[width]],
                         [z['auc_roc'] for z in FT[width].values()],
                         [z['auc_roc_err'] for z in FT[width].values()],
@@ -282,7 +276,8 @@ def randwise_plots(datasets, filename="FT", legendtitle="Fine Tuning Pruning",
                                   [z['auc_roc'] for z in FT[width].values()], markers):
                 eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color=color, label='_nolegend_')
             if filename is "FT":
-                txt = [str(z['dims']) for z in BO_best[rand][width].values()]
+
+                #txt = [str(z['dims']) for z in BO_best[rand][width].values()]
                 x = [int(key) for key in BO_best[rand][width]]
                 y = [z['auc_roc'] for z in BO_best[rand][width].values()]
                 eff_ax.scatter(x, y, marker="*", s=200, label='Best BO @ {}% Rand'.format(rand), color=color,
@@ -315,7 +310,7 @@ def randwise_plots(datasets, filename="FT", legendtitle="Fine Tuning Pruning",
                                   [z['net_efficiency'] for z in FT[width].values()], markers):
                 eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color=color, label='_nolegend_')
             if filename is "FT":
-                txt = [str(z['dims']) for z in BO_best[rand][width].values()]
+                #txt = [str(z['dims']) for z in BO_best[rand][width].values()]
                 x = [int(key) for key in BO_best[rand][width]]
                 y = [z['net_efficiency'] for z in BO_best[rand][width].values()]
                 eff_ax.scatter(x, y, marker="*", s=200, label='Best BO @ {}% Rand'.format(rand), color=color,
@@ -353,7 +348,8 @@ def randwise_plots(datasets, filename="FT", legendtitle="Fine Tuning Pruning",
                                   [z['accuracy'] for z in FT[width].values()], markers):
                 eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color=color, label='_nolegend_')
             if filename is "FT":
-                txt = [str(z['dims']) for z in BO_best[rand][width].values()]
+                print(BO_best[rand][width])
+                #txt = [str(z['dims']) for z in BO_best[rand][width].values()]
                 x = [int(key) for key in BO_best[rand][width]]
                 y = [z['accuracy'] for z in BO_best[rand][width].values()]
                 eff_ax.scatter(x, y, marker="*", s=200, label='Best BO @ {}% Rand'.format(rand), color=color,
@@ -364,111 +360,284 @@ def randwise_plots(datasets, filename="FT", legendtitle="Fine Tuning Pruning",
         eff_plot.show()
 
 if __name__ == "__main__":
-    # with open("results_json/rand_trials_250e/FT_0.json", "r") as read_file:
+    # with open("../results_json/rand_trials_250e/FT_0.json", "r") as read_file:
     #     FT_0 = json.load(read_file)
     #
-    # with open("results_json/rand_trials_250e/FT_25.json", "r") as read_file:
+    # with open("../results_json/rand_trials_250e/FT_25.json", "r") as read_file:
     #     FT_25 = json.load(read_file)
     #
-    # with open("results_json/rand_trials_250e/FT_50.json", "r") as read_file:
+    # with open("../results_json/rand_trials_250e/FT_50.json", "r") as read_file:
     #     FT_50 = json.load(read_file)
     #
-    # with open("results_json/rand_trials_250e/FT_75.json", "r") as read_file:
+    # with open("../results_json/rand_trials_250e/FT_75.json", "r") as read_file:
     #     FT_75 = json.load(read_file)
     #
-    # with open("results_json/rand_trials_250e/FT_90.json", "r") as read_file:
+    # with open("../results_json/rand_trials_250e/FT_90.json", "r") as read_file:
     #     FT_90 = json.load(read_file)
     #
-    # with open("results_json/rand_trials_250e/FT_100.json", "r") as read_file:
+    # with open("../results_json/rand_trials_250e/FT_100.json", "r") as read_file:
     #     FT_100 = json.load(read_file)
     #
     #
     #
-    # with open("results_json/BN_trials_250e/FT_0_BNNoStat.json", "r") as read_file:
+    # with open("../results_json/BN_trials_250e/FT_0_BNNoStat.json", "r") as read_file:
     #     FT_0_BNNoStat = json.load(read_file)
     #
     #
     #
-    # with open("results_json/BN_trials_250e/FT_0_NoBN.json", "r") as read_file:
+    # with open("../results_json/BN_trials_250e/FT_0_NoBN.json", "r") as read_file:
     #     FT_0_NoBN = json.load(read_file)
     #
-    # with open("results_json/BN_trials_250e/FT_25_NoBN.json", "r") as read_file:
+    # with open("../results_json/BN_trials_250e/FT_25_NoBN.json", "r") as read_file:
     #     FT_25_NoBN = json.load(read_file)
     #
-    # with open("results_json/BN_trials_250e/FT_50_NoBN.json", "r") as read_file:
+    # with open("../results_json/BN_trials_250e/FT_50_NoBN.json", "r") as read_file:
     #     FT_50_NoBN = json.load(read_file)
     #
-    # with open("results_json/BN_trials_250e/FT_75_NoBN.json", "r") as read_file:
+    # with open("../results_json/BN_trials_250e/FT_75_NoBN.json", "r") as read_file:
     #     FT_75_NoBN = json.load(read_file)
     #
-    # with open("results_json/BN_trials_250e/FT_90_NoBN.json", "r") as read_file:
+    # with open("../results_json/BN_trials_250e/FT_90_NoBN.json", "r") as read_file:
     #     FT_90_NoBN = json.load(read_file)
 
-    #with open("results_json/BN_trials_250e/FT_100_NoBN.json", "r") as read_file:
+    #with open("../results_json/BN_trials_250e/FT_100_NoBN.json", "r") as read_file:
    #     FT_100_NoBN = json.load(read_file)
 
 
-   # with open("results_json/BN_trials_250e/FT_0_NoL1.json", "r") as read_file:
+   # with open("../results_json/BN_trials_250e/FT_0_NoL1.json", "r") as read_file:
    #     FT_0_NoL1 = json.load(read_file)
 
-   # with open("results_json/BN_trials_250e/FT_25_NoL1.json", "r") as read_file:
+   # with open("../results_json/BN_trials_250e/FT_25_NoL1.json", "r") as read_file:
    #     FT_25_NoL1 = json.load(read_file)
 
-   # with open("results_json/BN_trials_250e/FT_50_NoL1.json", "r") as read_file:
+   # with open("../results_json/BN_trials_250e/FT_50_NoL1.json", "r") as read_file:
    #     FT_50_NoL1 = json.load(read_file)
 
-   # with open("results_json/BN_trials_250e/FT_75_NoL1.json", "r") as read_file:
+   # with open("../results_json/BN_trials_250e/FT_75_NoL1.json", "r") as read_file:
    #     FT_75_NoL1 = json.load(read_file)
 
-   #with open("results_json/BN_trials_250e/FT_90_NoL1.json", "r") as read_file:
+   #with open("../results_json/BN_trials_250e/FT_90_NoL1.json", "r") as read_file:
    #    FT_90_NoL1 = json.load(read_file)
 
-   # with open("results_json/BN_trials_250e/FT_100_NoL1.json", "r") as read_file:
+   # with open("../results_json/BN_trials_250e/FT_100_NoL1.json", "r") as read_file:
    #     FT_100_NoL1 = json.load(read_file)
 
 
-   # with open("results_json/BN_trials_250e/LT_0_BNNoStat.json", "r") as read_file:
+   # with open("../results_json/BN_trials_250e/LT_0_BNNoStat.json", "r") as read_file:
    #     LT_0_BNNoStat = json.load(read_file)
 
-    with open("results_json/rand_trials_250e/BO/BO.json", "r") as read_file:
+    with open("../results_json/BO_Redo/BO_Redo.json", "r") as read_file:
         BO = json.load(read_file)
 
     BO_best = {r:{} for r in rand_vals}
     for rand in BO_best:
-        with open("results_json/rand_trials_250e/BO/BO_best_{}.json".format(rand), "r") as read_file:
+        with open("../results_json/BO_Redo/BO_Best_{}_AiQ.json".format(rand), "r") as read_file:
             BO_best[rand].update(json.load(read_file))
 
 
 
    # FT_Trainset = []
    # for rand in rand_vals:
-   #     with open("results_json/rand_trials_250e/TrainSet/FT_{}_TRAINSET.json".format(rand), "r") as read_file:
+   #     with open("../results_json/rand_trials_250e/TrainSet/FT_{}_TRAINSET.json".format(rand), "r") as read_file:
    #        FT_Trainset.append(json.load(read_file))
    # FT_NoBN_Trainset = []
    # for rand in rand_vals:
-   #     with open("results_json/rand_trials_250e/TrainSet/FT_{}_NoBN_TRAINSET.json".format(rand), "r") as read_file:
+   #     with open("../results_json/rand_trials_250e/TrainSet/FT_{}_NoBN_TRAINSET.json".format(rand), "r") as read_file:
    #         FT_NoBN_Trainset.append(json.load(read_file))
    # FT_NoL1_Trainset = []
    # for rand in rand_vals:
-   #     with open("results_json/rand_trials_250e/TrainSet/FT_{}_NoL1_TRAINSET.json".format(rand), "r") as read_file:
+   #     with open("../results_json/rand_trials_250e/TrainSet/FT_{}_NoL1_TRAINSET.json".format(rand), "r") as read_file:
    #         FT_NoL1_Trainset.append(json.load(read_file))
 
-    FT_kf = gen_mean_err_set("results_json/all_kfold_json/FT/FT_{}_K{}.json")
-    FT_NoBN_kf = gen_mean_err_set("results_json/all_kfold_json/FT_NoBN/FT_{}_NoBN_K{}.json")
-    FT_NoL1_kf = gen_mean_err_set("results_json/all_kfold_json/FT_NoL1/FT_{}_NoL1_K{}.json")
-    LT_kf = gen_mean_err_set("results_json/all_kfold_json/LT/LT_{}_K{}.json")
+    FT_kf = gen_mean_err_set("../results_json/all_kfold_json/FT/FT_{}_K{}.json")
+    FT_NoBN_kf = gen_mean_err_set("../results_json/all_kfold_json/FT_NoBN/FT_{}_NoBN_K{}.json")
+    FT_NoL1_kf = gen_mean_err_set("../results_json/all_kfold_json/FT_NoL1/FT_{}_NoL1_K{}.json")
+    LT_kf = gen_mean_err_set("../results_json/all_kfold_json/LT/LT_{}_K{}.json")
 
     colors = ['blue', 'green', 'red', 'orange', 'purple']
-    #Normal, "Test Set" runs
-    randwise_plots(FT_kf, "FT")
-    randwise_plots(FT_NoBN_kf, "FT_NoBN", "FT, No BatNorm")
-    randwise_plots(FT_NoL1_kf, "FT_NoL1", "FT, No L1 Reg")
-    randwise_plots(LT_kf, "LT")
+
+    #Normal, "Test Set" runs - Comment out lines to disable generation of that plot set
+
+    #randwise_plots(FT_kf, "FT")
+    #randwise_plots(FT_NoBN_kf, "FT_NoBN", "FT, No BatNorm")
+    #randwise_plots(FT_NoL1_kf, "FT_NoL1", "FT, No L1 Reg")
+    #randwise_plots(LT_kf, "LT")
 
     best = {'4b': [44, 32, 32],
             '6b': [54, 32, 32],
             '12b': [64, 32, 19],
             '32b': [64, 28, 27]}
+
+    # BO 4b vs 32b
+    # Accuracy plot
+    eff_plot = plt.figure()
+    eff_ax = eff_plot.add_subplot()
+    eff_ax.grid(True)
+    eff_ax.set_xlabel('BOPs')
+    eff_ax.set_ylabel('Accuracy')
+    eff_ax.set_xscale("symlog", linthresh=1e6)
+    eff_ax.set_xlim(1e4, 1e7)
+    eff_ax.set_ylim(0.6, 0.8)
+    # eff_ax.set_title("Accuracy vs BOPS (HLS4ML Jet Tagging Model)")
+    eff_ax.errorbar([int(key) for key in FT_kf[0]['32b']],
+                    [z['accuracy'] for z in FT_kf[0]['32b'].values()],
+                    [z['accuracy_err'] for z in FT_kf[0]['32b'].values()],
+                    label='32b FT', capsize=8,
+                    linestyle='solid', color='red')  # , marker='.',markersize=10,
+    for x, y, mark in zip([int(key) for key in FT_kf[0]['32b']],
+                          [z['accuracy'] for z in FT_kf[0]['32b'].values()], markers):
+        eff_ax.plot(x, y, linestyle='solid', marker=mark, markersize=10, color='red', label='_nolegend_')
+
+    eff_ax.errorbar([int(key) for key in FT_kf[0]['4b']],
+                    [z['accuracy'] for z in FT_kf[0]['4b'].values()],
+                    [z['accuracy_err'] for z in FT_kf[0]['4b'].values()],
+                    label='4b FT', capsize=8,
+                    linestyle='solid', color='blue')  # , marker='.',markersize=10,
+    for x, y, mark in zip([int(key) for key in FT_kf[0]['4b']],
+                          [z['accuracy'] for z in FT_kf[0]['4b'].values()], markers):
+        eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color='blue', label='_nolegend_')
+
+    eff_ax.scatter([int(key) for key in BO['32b']], [z['accuracy'] for z in BO['32b'].values()],
+                   label='32b BO', color='red', s=200,
+                   alpha=0.1)  # , marker='.',markersize=10,
+    for txt, x, y, isbest in zip([str(z['dims']) for z in BO['32b'].values()], [int(key) for key in BO['32b']],
+                                 [z['accuracy'] for z in BO['32b'].values()],
+                                 [z['best'] for z in BO['32b'].values()]):
+        if isbest:
+            eff_ax.annotate(txt, (x, y), color='red', label='_nolegend_', size=24)
+            eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('32b', txt), color='red',
+                           edgecolor='blue', zorder=10)
+
+    eff_ax.scatter([int(key) for key in BO['4b']], [z['accuracy'] for z in BO['4b'].values()],
+                   label='4b BO', color='blue', s=200,
+                   alpha=0.1)  # , marker='.',markersize=10,
+    for txt, x, y, isbest in zip([str(z['dims']) for z in BO['4b'].values()], [int(key) for key in BO['4b']],
+                                 [z['accuracy'] for z in BO['4b'].values()],
+                                 [z['best'] for z in BO['4b'].values()]):
+        if isbest:
+            #eff_ax.annotate(txt, (x, y), color='blue', label='_nolegend_', size=24)
+            eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('4b', txt), color='blue',
+                           edgecolor='red', zorder=10)
+    eff_ax.legend(title='Optimization Technique', loc='best', framealpha=0.5)
+    # eff_ax.add_artist(
+    #    plt.legend(handles=marker_lines, title='Percent pruned (approx.)', loc='upper right', framealpha=0.5))
+    eff_plot.savefig('ACC_BOFT_32_4.pdf')
+    # eff_plot.savefig('ACC_FT_BNcomp.pdf')
+    eff_plot.show()
+
+
+    # BO 4b vs 32b
+    # Accuracy plot
+    eff_plot = plt.figure()
+    eff_ax = eff_plot.add_subplot()
+    eff_ax.grid(True)
+    eff_ax.set_xlabel('BOPs')
+    eff_ax.set_ylabel('Accuracy')
+    eff_ax.set_xscale("symlog", linthresh=1e6)
+    eff_ax.set_xlim(1e4, 1e7)
+    eff_ax.set_ylim(0.6, 0.8)
+    # eff_ax.set_title("Accuracy vs BOPS (HLS4ML Jet Tagging Model)")
+    eff_ax.errorbar([int(key) for key in FT_kf[0]['32b']],
+                    [z['accuracy'] for z in FT_kf[0]['32b'].values()],
+                    [z['accuracy_err'] for z in FT_kf[0]['32b'].values()],
+                    label='32b FT', capsize=8,
+                    linestyle='solid', color='red')  # , marker='.',markersize=10,
+    for x, y, mark in zip([int(key) for key in FT_kf[0]['32b']],
+                          [z['accuracy'] for z in FT_kf[0]['32b'].values()], markers):
+        eff_ax.plot(x, y, linestyle='solid', marker=mark, markersize=10, color='red', label='_nolegend_')
+
+    eff_ax.errorbar([int(key) for key in FT_kf[0]['6b']],
+                    [z['accuracy'] for z in FT_kf[0]['6b'].values()],
+                    [z['accuracy_err'] for z in FT_kf[0]['6b'].values()],
+                    label='6b FT', capsize=8,
+                    linestyle='solid', color='blue')  # , marker='.',markersize=10,
+    for x, y, mark in zip([int(key) for key in FT_kf[0]['6b']],
+                          [z['accuracy'] for z in FT_kf[0]['6b'].values()], markers):
+        eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color='blue', label='_nolegend_')
+
+    eff_ax.scatter([int(key) for key in BO['32b']], [z['accuracy'] for z in BO['32b'].values()],
+                   label='32b BO', color='red', s=200,
+                   alpha=0.1)  # , marker='.',markersize=10,
+    for txt, x, y, isbest in zip([str(z['dims']) for z in BO['32b'].values()], [int(key) for key in BO['32b']],
+                                 [z['accuracy'] for z in BO['32b'].values()],
+                                 [z['best'] for z in BO['32b'].values()]):
+        if isbest:
+            #eff_ax.annotate(txt, (x, y), color='red', label='_nolegend_', size=24)
+            eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('32b', txt), color='red',
+                           edgecolor='blue', zorder=10)
+
+    eff_ax.scatter([int(key) for key in BO['6b']], [z['accuracy'] for z in BO['6b'].values()],
+                   label='6b BO', color='blue', s=200,
+                   alpha=0.1)  # , marker='.',markersize=10,
+    for txt, x, y, isbest in zip([str(z['dims']) for z in BO['6b'].values()], [int(key) for key in BO['6b']],
+                                 [z['accuracy'] for z in BO['6b'].values()],
+                                 [z['best'] for z in BO['6b'].values()]):
+        if isbest:
+            #eff_ax.annotate(txt, (x, y), color='blue', label='_nolegend_', size=24)
+            eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('6b', txt), color='blue',
+                           edgecolor='red', zorder=10)
+    eff_ax.legend(title='Optimization Technique', loc='best', framealpha=0.5)
+    # eff_ax.add_artist(
+    #    plt.legend(handles=marker_lines, title='Percent pruned (approx.)', loc='upper right', framealpha=0.5))
+    eff_plot.savefig('ACC_BOFT_32_6.pdf')
+    # eff_plot.savefig('ACC_FT_BNcomp.pdf')
+    eff_plot.show()
+    # BO 6b vs 32b
+    # Accuracy plot
+    eff_plot = plt.figure()
+    eff_ax = eff_plot.add_subplot()
+    eff_ax.grid(True)
+    eff_ax.set_xlabel('BOPs')
+    eff_ax.set_ylabel('Accuracy')
+    eff_ax.set_xscale("symlog", linthresh=1e6)
+    eff_ax.set_xlim(1e4, 1e7)
+    eff_ax.set_ylim(0.6, 0.8)
+    # eff_ax.set_title("Accuracy vs BOPS (HLS4ML Jet Tagging Model)")
+    eff_ax.errorbar([int(key) for key in FT_kf[0]['32b']],
+                    [z['accuracy'] for z in FT_kf[0]['32b'].values()],
+                    [z['accuracy_err'] for z in FT_kf[0]['32b'].values()],
+                    label='32b FT', capsize=8,
+                    linestyle='solid', color='red')  # , marker='.',markersize=10,
+    for x, y, mark in zip([int(key) for key in FT_kf[0]['32b']],
+                          [z['accuracy'] for z in FT_kf[0]['32b'].values()], markers):
+        eff_ax.plot(x, y, linestyle='solid', marker=mark, markersize=10, color='red', label='_nolegend_')
+
+    eff_ax.errorbar([int(key) for key in FT_kf[0]['12b']],
+                    [z['accuracy'] for z in FT_kf[0]['12b'].values()],
+                    [z['accuracy_err'] for z in FT_kf[0]['12b'].values()],
+                    label='12b FT', capsize=8,
+                    linestyle='solid', color='blue')  # , marker='.',markersize=10,
+    for x, y, mark in zip([int(key) for key in FT_kf[0]['12b']],
+                          [z['accuracy'] for z in FT_kf[0]['12b'].values()], markers):
+        eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color='blue', label='_nolegend_')
+
+    eff_ax.scatter([int(key) for key in BO['32b']], [z['accuracy'] for z in BO['32b'].values()],
+                   label='32b BO', color='red', s=200,
+                   alpha=0.1)  # , marker='.',markersize=10,
+    for txt, x, y, isbest in zip([str(z['dims']) for z in BO['32b'].values()], [int(key) for key in BO['32b']],
+                                 [z['accuracy'] for z in BO['32b'].values()],
+                                 [z['best'] for z in BO['32b'].values()]):
+        if isbest:
+            eff_ax.annotate(txt, (x, y), color='red', label='_nolegend_', size=24)
+            eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('32b', txt), color='red',
+                           edgecolor='blue', zorder=10)
+
+    eff_ax.scatter([int(key) for key in BO['12b']], [z['accuracy'] for z in BO['12b'].values()],
+                   label='12b BO', color='blue', s=200,
+                   alpha=0.1)  # , marker='.',markersize=10,
+    for txt, x, y, isbest in zip([str(z['dims']) for z in BO['12b'].values()], [int(key) for key in BO['12b']],
+                                 [z['accuracy'] for z in BO['12b'].values()],
+                                 [z['best'] for z in BO['12b'].values()]):
+        if isbest:
+            #eff_ax.annotate(txt, (x, y), color='blue', label='_nolegend_', size=24)
+            eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('12b', txt), color='blue',
+                           edgecolor='red', zorder=10)
+    eff_ax.legend(title='Optimization Technique', loc='best', framealpha=0.5)
+    # eff_ax.add_artist(
+    #    plt.legend(handles=marker_lines, title='Percent pruned (approx.)', loc='upper right', framealpha=0.5))
+    eff_plot.savefig('ACC_BOFT_32_12.pdf')
+    # eff_plot.savefig('ACC_FT_BNcomp.pdf')
+    eff_plot.show()
 
     labels_list = ['j_g', 'j_q', 'j_w', 'j_z', 'j_t']
     for label in labels_list:
@@ -499,10 +668,11 @@ if __name__ == "__main__":
             aiq_ax.scatter([int(key) for key in BO[w]], [z['sel_bkg_reject'][label] for z in BO[w].values()],
                            label='{} BO'.format(w), color=color, s=200,
                            alpha=0.1)  # , marker='.',markersize=10,
-            for txt, x, y in zip([str(z['dims']) for z in BO[w].values()], [int(key) for key in BO[w]],
-                                 [z['sel_bkg_reject'][label] for z in BO[w].values()]):
-                if txt == str(best[w]):
-                    aiq_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('6b', txt), color='blue',
+            for txt, x, y, isbest in zip([str(z['dims']) for z in BO[w].values()], [int(key) for key in BO[w]],
+                                 [z['sel_bkg_reject'][label] for z in BO[w].values()],
+                                 [z['best'] for z in BO[w].values()]):
+                if isbest:
+                    aiq_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('6b', txt), color=color,
                                    edgecolor=ec, zorder=10)
         aiq_ax.legend(loc='upper right', title="Class {}".format(label))
         aiq_plot.savefig('bgd_eff_{}_32_6_BOFT_BOPS.pdf'.format(label))
@@ -510,8 +680,10 @@ if __name__ == "__main__":
 
     # ~~~~~~~~~~~~~~~~~ LT vs FT Plots ~~~~~~~~~~~~~~~~~~~~
 
-    fig = pylab.figure(figsize=(5,10))
-    fig.add_artist(pylab.figlegend(handles=marker_lines, title='Percent pruned (approx.)', framealpha=0.5)) #,  bbox_to_anchor=(1.05, 1), loc='upper left'
+    fig = pylab.figure(figsize=(13,1.75))
+    leg_artist = pylab.figlegend(handles=marker_lines, title='Percent pruned (approx.)', framealpha=0.5, ncol=math.ceil(len(marker_lines)/2.0))
+    leg_artist._legend_box.align = 'center'
+    artist_handle = fig.add_artist(leg_artist)  # ,  bbox_to_anchor=(1.05, 1), loc='upper left'
     fig.savefig("PruningLegend.pdf")
     fig.show()
 
@@ -618,10 +790,10 @@ if __name__ == "__main__":
 
 
     #print(BO_best)
-    best = {'4b': [44, 32, 32],
-            '6b': [54, 32, 32],
-            '12b': [64, 32, 19],
-            '32b': [64, 28, 27]}
+    #best = {'4b': [44, 32, 32],
+    #        '6b': [54, 32, 32],
+    #        '12b': [64, 32, 19],
+    #        '32b': [64, 28, 27]}
 
     #ft_models = [FT_0, FT_50, FT_75, FT_90]
     #NoBN_Models = [FT_0_NoBN,  FT_50_NoBN, FT_75_NoBN, FT_90_NoBN]
@@ -939,60 +1111,6 @@ if __name__ == "__main__":
         # eff_plot.savefig('ACC_FT_rand{}.pdf'.format(rand))
         eff_plot.show()
 
-    # BO 6b vs 32b
-    # Accuracy plot
-    eff_plot = plt.figure()
-    eff_ax = eff_plot.add_subplot()
-    eff_ax.grid(True)
-    eff_ax.set_xlabel('BOPs')
-    eff_ax.set_ylabel('Accuracy')
-    eff_ax.set_xscale("symlog", linthresh=1e6)
-    eff_ax.set_xlim(1e4, 1e7)
-    eff_ax.set_ylim(0.6, 0.8)
-    #eff_ax.set_title("Accuracy vs BOPS (HLS4ML Jet Tagging Model)")
-    eff_ax.errorbar([int(key) for key in FT_kf[0]['32b']],
-                [z['accuracy'] for z in FT_kf[0]['32b'].values()],
-                [z['accuracy_err'] for z in FT_kf[0]['32b'].values()],
-                label='32b FT', capsize=8,
-                linestyle='solid', color='red')  # , marker='.',markersize=10,
-    for x, y, mark in zip([int(key) for key in FT_kf[0]['32b']],
-                          [z['accuracy'] for z in FT_kf[0]['32b'].values()], markers):
-        eff_ax.plot(x, y, linestyle='solid', marker=mark, markersize=10, color='red', label='_nolegend_')
-
-    eff_ax.errorbar([int(key) for key in FT_kf[0]['6b']],
-                [z['accuracy'] for z in FT_kf[0]['6b'].values()],
-                [z['accuracy_err'] for z in FT_kf[0]['6b'].values()],
-                label='6b FT', capsize=8,
-                linestyle='solid', color='blue')  # , marker='.',markersize=10,
-    for x, y, mark in zip([int(key) for key in FT_kf[0]['6b']],
-                          [z['accuracy'] for z in FT_kf[0]['6b'].values()], markers):
-        eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color='blue', label='_nolegend_')
-
-    eff_ax.scatter([int(key) for key in BO['32b']], [z['accuracy'] for z in BO['32b'].values()],
-                       label='32b BO', color='red', s=200,
-                       alpha=0.1)  # , marker='.',markersize=10,
-    for txt, x, y in zip([str(z['dims']) for z in BO['32b'].values()], [int(key) for key in BO['32b']],
-                         [z['accuracy'] for z in BO['32b'].values()]):
-        if txt == str(best['32b']):
-            eff_ax.annotate(txt, (x, y), color='red', label='_nolegend_', size=24)
-            eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('32b', txt), color='red',
-                           edgecolor='blue', zorder=10)
-
-    eff_ax.scatter([int(key) for key in BO['6b']], [z['accuracy'] for z in BO['6b'].values()],
-                       label='6b BO', color='blue', s=200,
-                       alpha=0.1)  # , marker='.',markersize=10,
-    for txt, x, y in zip([str(z['dims']) for z in BO['6b'].values()], [int(key) for key in BO['6b']],
-                         [z['accuracy'] for z in BO['6b'].values()]):
-        if txt == str(best['6b']):
-            eff_ax.annotate(txt, (x, y), color='blue', label='_nolegend_', size=24)
-            eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('6b', txt), color='blue',
-                           edgecolor='red', zorder=10)
-    eff_ax.legend(title='Optimization Technique', loc='best', framealpha=0.5)
-    # eff_ax.add_artist(
-    #    plt.legend(handles=marker_lines, title='Percent pruned (approx.)', loc='upper right', framealpha=0.5))
-    eff_plot.savefig('ACC_BOFT_32_6.pdf')
-    # eff_plot.savefig('ACC_FT_BNcomp.pdf')
-    eff_plot.show()
 
     # AUC ROC plot
     eff_plot = plt.figure()
@@ -1097,7 +1215,7 @@ if __name__ == "__main__":
 
 
 
-    with open("results_json/rand_trials_250e/BO/BO.json", "r") as read_file:
+    with open("../results_json/rand_trials_250e/BO/BO.json", "r") as read_file:
         BO = json.load(read_file)
 
     best = {'4b':[44,32,32],
