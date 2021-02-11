@@ -261,5 +261,5 @@ if __name__ == "__main__": # If running, train a single model given some paramet
 
     filename = 'model_AIQ_{}_{}.json'.format(options.size, options.bits)
     with open(path.join(options.outputDir, filename), 'w') as fp:
-        json.dump({'{}b'.format(options.bits): {int(calc_BOPS(model, options.bits)): final_aiq, 'dims': str(model_size)}}, fp)
+        json.dump({'{}b'.format(options.bits): {int(calc_BOPS(model)): final_aiq, 'dims': str(model_size)}}, fp)
 

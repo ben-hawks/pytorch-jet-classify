@@ -368,7 +368,7 @@ def post_bo_train(dims,train_loader,val_loader,eval_loader,best=False):
     with open(path.join(options.outputDir, filename), 'w') as fp:
         json.dump(model_totalloss_json_dict, fp)
     final_aiq.update({'dims': str(dims_str), 'best':best})
-    aiq_entry ={int(calc_BOPS(model, options.bits)): final_aiq}
+    aiq_entry ={int(calc_BOPS(model)): final_aiq}
 
     return aiq_entry
 

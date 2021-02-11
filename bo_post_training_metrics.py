@@ -27,6 +27,7 @@ import models
 import matplotlib.pyplot as plt
 import ast
 import re
+import numpy as np
 from optparse import OptionParser
 from tools.aiq import calc_AiQ
 from tools.param_count import calc_BOPS, countNonZeroWeights
@@ -47,8 +48,10 @@ def gen_bo_model_dict(dir, bits=32):
         dir_list.sort()
         for file in dir_list:
             try:
-                sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
-                dims = [int(m) for m in sizestr.split(',')]
+                #sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
+                sizestr1 = file[7:]
+                sizestr = sizestr1[:-5]
+                dims = [int(m) for m in sizestr.replace(' ', '').split(',')]
                 prune_masks = {
                     "fc1": torch.ones(dims[0], 16),
                     "fc2": torch.ones(dims[1], dims[0]),
@@ -121,23 +124,23 @@ dir = "model_files/"
 dir = options.model_files
 
 
-try:
-    if options.batnorm:
-        loadmodel = models.three_layer_model_batnorm_masked(prune_mask_set, bn_affine=options.bn_affine,
-                                                        bn_stats=options.bn_stats)
-    else:
-        loadmodel = models.three_layer_model_masked(prune_mask_set)  # 32b
-
-    float_model_set, model_max_params = gen_bo_model_dict(os.path.join(dir, '32b'),32)
-except Exception as e:
-    print(e)
-    float_model_set, model_max_params = {},0
-
-
-try:
-    quant_model_set_4b, quant_4b_max_params = gen_bo_model_dict(os.path.join(dir, '4b'),4)
-except:
-    quant_model_set_4b, quant_4b_max_params = {},0
+# try:
+#     if options.batnorm:
+#         loadmodel = models.three_layer_model_batnorm_masked(prune_mask_set, bn_affine=options.bn_affine,
+#                                                         bn_stats=options.bn_stats)
+#     else:
+#         loadmodel = models.three_layer_model_masked(prune_mask_set)  # 32b
+#
+#     float_model_set, model_max_params = gen_bo_model_dict(os.path.join(dir, '32b'),32)
+# except Exception as e:
+#     print(e)
+#     float_model_set, model_max_params = {},0
+#
+#
+# try:
+#     quant_model_set_4b, quant_4b_max_params = gen_bo_model_dict(os.path.join(dir, '4b'),4)
+# except:
+#     quant_model_set_4b, quant_4b_max_params = {},0
 
 
 try:
@@ -146,66 +149,69 @@ except:
     quant_model_set_6b, quant_6b_max_params = {},0
 
 
-try:
-    quant_model_set_12b, quant_12b_max_params = gen_bo_model_dict(os.path.join(dir, '12b'),12)
-except:
-    quant_model_set_12b, quant_12b_max_params = {},0
+# try:
+#     quant_model_set_12b, quant_12b_max_params = gen_bo_model_dict(os.path.join(dir, '12b'),12)
+# except:
+#     quant_model_set_12b, quant_12b_max_params = {},0
 
 #Run through each model set, calculating AiQ for each model in the set
-float_AiQ = {}
-for model_bops, model_file in sorted(float_model_set.items()):
-    sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
-    dims = [int(m) for m in sizestr.split(',')]
-    size = dims
-    prune_masks = {
-        "fc1": torch.ones(dims[0], 16),
-        "fc2": torch.ones(dims[1], dims[0]),
-        "fc3": torch.ones(dims[2], dims[1]),
-        "fc4": torch.ones(5, dims[2])}
-    print('Calculating AiQ for BO 32b, ' + str(model_bops) + ' BOPS, size ' + str(size))
-    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,32), test_loader, loadfile=os.path.join(dir, '32b', model_file),
-                       batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
-    results.update({'dims': dims})
-    float_AiQ.update({model_bops: results})
-
-quant_12b_AiQ = {}
-for model_bops, model_file in sorted(quant_model_set_12b.items()):
-    sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
-    dims = [int(m) for m in sizestr.split(',')]
-    size = dims
-    prune_masks = {
-        "fc1": torch.ones(dims[0], 16),
-        "fc2": torch.ones(dims[1], dims[0]),
-        "fc3": torch.ones(dims[2], dims[1]),
-        "fc4": torch.ones(5, dims[2])}
-    print('Calculating AiQ for BO 12b, ' + str(model_bops) + ' BOPS, size ' + str(size))
-    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,12), test_loader, loadfile=os.path.join(dir, '12b', model_file),
-                       batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
-    results.update({'dims': dims})
-    quant_12b_AiQ.update({model_bops: results})
-
-
-quant_4b_AiQ = {}
-for model_bops, model_file in sorted(quant_model_set_4b.items()):
-    sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
-    dims = [int(m) for m in sizestr.split(',')]
-    size = dims
-    prune_masks = {
-        "fc1": torch.ones(dims[0], 16),
-        "fc2": torch.ones(dims[1], dims[0]),
-        "fc3": torch.ones(dims[2], dims[1]),
-        "fc4": torch.ones(5, dims[2])}
-    print('Calculating AiQ for BO 4b, ' + str(model_bops) + ' BOPS, size ' + str(size))
-    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,4), test_loader, loadfile=os.path.join(dir, '4b', model_file),
-                       batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
-    results.update({'dims': dims})
-    quant_4b_AiQ.update({model_bops: results})
+# float_AiQ = {}
+# for model_bops, model_file in sorted(float_model_set.items()):
+#     sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
+#     dims = [int(m) for m in sizestr.split(',')]
+#     size = dims
+#     prune_masks = {
+#         "fc1": torch.ones(dims[0], 16),
+#         "fc2": torch.ones(dims[1], dims[0]),
+#         "fc3": torch.ones(dims[2], dims[1]),
+#         "fc4": torch.ones(5, dims[2])}
+#     print('Calculating AiQ for BO 32b, ' + str(model_bops) + ' BOPS, size ' + str(size))
+#     results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,32), test_loader, loadfile=os.path.join(dir, '32b', model_file),
+#                        batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
+#     results.update({'dims': dims})
+#     float_AiQ.update({model_bops: results})
+#
+# quant_12b_AiQ = {}
+# for model_bops, model_file in sorted(quant_model_set_12b.items()):
+#     sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
+#     dims = [int(m) for m in sizestr.split(',')]
+#     size = dims
+#     prune_masks = {
+#         "fc1": torch.ones(dims[0], 16),
+#         "fc2": torch.ones(dims[1], dims[0]),
+#         "fc3": torch.ones(dims[2], dims[1]),
+#         "fc4": torch.ones(5, dims[2])}
+#     print('Calculating AiQ for BO 12b, ' + str(model_bops) + ' BOPS, size ' + str(size))
+#     results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,12), test_loader, loadfile=os.path.join(dir, '12b', model_file),
+#                        batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
+#     results.update({'dims': dims})
+#     quant_12b_AiQ.update({model_bops: results})
+#
+#
+# quant_4b_AiQ = {}
+# for model_bops, model_file in sorted(quant_model_set_4b.items()):
+#     sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
+#     dims = [int(m) for m in sizestr.split(',')]
+#     size = dims
+#     prune_masks = {
+#         "fc1": torch.ones(dims[0], 16),
+#         "fc2": torch.ones(dims[1], dims[0]),
+#         "fc3": torch.ones(dims[2], dims[1]),
+#         "fc4": torch.ones(5, dims[2])}
+#     print('Calculating AiQ for BO 4b, ' + str(model_bops) + ' BOPS, size ' + str(size))
+#     results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,4), test_loader, loadfile=os.path.join(dir, '4b', model_file),
+#                        batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
+#     results.update({'dims': dims})
+#     quant_4b_AiQ.update({model_bops: results})
 
 quant_6b_AiQ = {}
 for model_bops, model_file in sorted(quant_model_set_6b.items()):
-    sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
-    dims = [int(m) for m in sizestr.split(',')]
+    #sizestr = re.search('(\d\d?,\d\d?,\d\d?)',model_file.replace(' ','')).group() #Get the model side from the filename, just saves a bunch of headache
+    sizestr1 = model_file[7:]
+    sizestr = sizestr1[:-5]
+    dims = [int(m) for m in sizestr.replace(' ', '').split(',')]
     size = dims
+
     prune_masks = {
         "fc1": torch.ones(dims[0], 16),
         "fc2": torch.ones(dims[1], dims[0]),
@@ -214,95 +220,105 @@ for model_bops, model_file in sorted(quant_model_set_6b.items()):
     print('Calculating AiQ for BO 6b, ' + str(model_bops) + ' BOPS, size ' + str(size))
     results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,6), test_loader, loadfile=os.path.join(dir, '6b', model_file),
                        batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
-    results.update({'dims': dims})
+    results.update({'dims': dims, 'best': False})
     quant_6b_AiQ.update({model_bops: results})
 
+#doesn't work right now, just selects the last item as best :/
+best_loss_bops = 0
+for bops, results in quant_6b_AiQ.items():
+    best_loss = float(999999)
+    if results['bce_loss'] < best_loss:
+        best_loss = results['bce_loss']
+        print (best_loss)
+        best_loss_bops = bops
+quant_6b_AiQ[best_loss_bops].update({'best': True})
+
 import json
-dump_dict={ '32b':float_AiQ,
-            '12b':quant_12b_AiQ,
-            '6b':quant_6b_AiQ,
-            '4b':quant_4b_AiQ
+dump_dict={ #'32b':float_AiQ,
+            #'12b':quant_12b_AiQ,
+            '6b':quant_6b_AiQ#,
+            #'4b':quant_4b_AiQ
 }
 
 with open(os.path.join(options.outputDir, options.name+".json"), 'w') as fp:
     json.dump(dump_dict, fp)
 
-best = {'4b': [44, 32, 32],
-        '6b': [54, 32, 32],
-        '12b': [64, 32, 19],
-        '32b': [64, 28, 27]}
+#best = {'4b': [44, 32, 32],
+#        '6b': [54, 32, 32],
+#        '12b': [64, 32, 19],
+#        '32b': [64, 28, 27]}
 
-# AUCROC Plot
-precisions = ['32b','12b','6b','4b']  #,'8b']  # What precisions to plot
-colors = ['blue', 'green', 'red', 'orange', 'purple', 'pink']  # What colors to use for plots
-for precision, color in zip(precisions, colors):
-    eff_plot = plt.figure()
-    eff_ax = eff_plot.add_subplot()
-    eff_ax.grid(True)
-    eff_ax.set_xlabel('BOPs')
-    eff_ax.set_ylabel('AUC')
-    eff_ax.set_xscale("symlog", linthresh=1e6)
-    eff_ax.set_xlim(1e4, 1e7)
-    eff_ax.set_ylim(0.45, 1)
-    eff_ax.set_title("AUC vs BOPS - BO ({} HLS4ML Jet Tagging Model)".format(precision))
-    eff_ax.scatter([int(key) for key in dump_dict[precision]], [z['auc_roc'] for z in dump_dict[precision].values()],
-                   label='{}-bit'.format(precision.rstrip('b')), color=color, alpha=0.5)  # , marker='.',markersize=10,
-    for txt, x, y in zip([str(z['dims']) for z in dump_dict[precision].values()], [int(key) for key in dump_dict[precision]],
-                         [z['auc_roc'] for z in dump_dict[precision].values()]):
-        if txt == str(best[precision]):
-            eff_ax.annotate(txt, (x, y), color='black', label='_nolegend_')
-            eff_ax.scatter(x, y, marker="*", s=75, label='Best {} ({})'.format(precision, txt), color=color,
-                           edgecolor='black')
-    eff_ax.legend(loc='best', title="Bayesian Optimization", framealpha=0.5)
-    eff_plot.savefig('AUCROC_BO_{}.png'.format(precision))
-    # eff_plot.savefig('AUCROC_FT_rand{}.pdf'.format(rand))
-    eff_plot.show()
-
-# Accuracy plot
-for precision, color in zip(precisions, colors):
-    eff_plot = plt.figure()
-    eff_ax = eff_plot.add_subplot()
-    eff_ax.grid(True)
-    eff_ax.set_xlabel('BOPs')
-    eff_ax.set_ylabel('Accuracy')
-    eff_ax.set_xscale("symlog", linthresh=1e6)
-    eff_ax.set_xlim(1e4, 1e7)
-    eff_ax.set_ylim(0.6, 0.8)
-    eff_ax.set_title("Accuracy vs BOPS - BO ({} HLS4ML Jet Tagging Model)".format(precision))
-    eff_ax.scatter([int(key) for key in dump_dict[precision]], [z['accuracy'] for z in dump_dict[precision].values()],
-                   label='{}-bit'.format(precision.rstrip('b')), color=color, alpha=0.5)  # , marker='.',markersize=10,
-    for txt, x, y in zip([str(z['dims']) for z in dump_dict[precision].values()], [int(key) for key in dump_dict[precision]],
-                         [z['accuracy'] for z in dump_dict[precision].values()]):
-        if txt == str(best[precision]):
-            eff_ax.annotate(txt, (x, y), color='black', label='_nolegend_')
-            eff_ax.scatter(x, y, marker="*", s=75, label='Best {} ({})'.format(precision, txt), color=color,
-                           edgecolor='black')
-    eff_ax.legend(loc='best', title="Bayesian Optimization", framealpha=0.5)
-    eff_plot.savefig('ACC_BO_{}.png'.format(precision))
-    # eff_plot.savefig('ACC_FT_rand{}.pdf'.format(rand))
-    eff_plot.show()
-
-# Efficiency plot
-for precision, color in zip(precisions, colors):
-    eff_plot = plt.figure()
-    eff_ax = eff_plot.add_subplot()
-    eff_ax.grid(True)
-    eff_ax.set_xlabel('BOPs')
-    eff_ax.set_ylabel('Efficiency')
-    eff_ax.set_xscale("symlog", linthresh=1e6)
-    eff_ax.set_xlim(1e4, 1e7)
-    eff_ax.set_ylim(0, 0.6)
-    eff_ax.set_title("Efficiency vs BOPS BO ({} HLS4ML Jet Tagging Model)".format(precision))
-    eff_ax.scatter([int(key) for key in dump_dict[precision]], [z['net_efficiency'] for z in dump_dict[precision].values()],
-                   label='{}-bit'.format(precision.rstrip('b')), color=color, alpha=0.5)  # , marker='.',markersize=10,
-    for txt, x, y in zip([str(z['dims']) for z in dump_dict[precision].values()], [int(key) for key in dump_dict[precision]],
-                         [z['net_efficiency'] for z in dump_dict[precision].values()]):
-        if txt == str(best[precision]):
-            eff_ax.annotate(txt, (x, y), color='black', label='_nolegend_')
-            eff_ax.scatter(x, y, marker="*", s=75, label='Best {} ({})'.format(precision, txt), color=color,
-                           edgecolor='black')
-    eff_ax.legend(loc='best', title="Bayesian Optimization", framealpha=0.5)
-    eff_plot.savefig('Eff_BO_{}.png'.format(precision))
-    # eff_plot.savefig('ACC_FT_rand{}.pdf'.format(rand))
-    eff_plot.show()
+# # AUCROC Plot
+# precisions = ['32b','12b','6b','4b']  #,'8b']  # What precisions to plot
+# colors = ['blue', 'green', 'red', 'orange', 'purple', 'pink']  # What colors to use for plots
+# for precision, color in zip(precisions, colors):
+#     eff_plot = plt.figure()
+#     eff_ax = eff_plot.add_subplot()
+#     eff_ax.grid(True)
+#     eff_ax.set_xlabel('BOPs')
+#     eff_ax.set_ylabel('AUC')
+#     eff_ax.set_xscale("symlog", linthresh=1e6)
+#     eff_ax.set_xlim(1e4, 1e7)
+#     eff_ax.set_ylim(0.45, 1)
+#     eff_ax.set_title("AUC vs BOPS - BO ({} HLS4ML Jet Tagging Model)".format(precision))
+#     eff_ax.scatter([int(key) for key in dump_dict[precision]], [z['auc_roc'] for z in dump_dict[precision].values()],
+#                    label='{}-bit'.format(precision.rstrip('b')), color=color, alpha=0.5)  # , marker='.',markersize=10,
+#     for txt, x, y in zip([str(z['dims']) for z in dump_dict[precision].values()], [int(key) for key in dump_dict[precision]],
+#                          [z['auc_roc'] for z in dump_dict[precision].values()]):
+#         if txt == str(best[precision]):
+#             eff_ax.annotate(txt, (x, y), color='black', label='_nolegend_')
+#             eff_ax.scatter(x, y, marker="*", s=75, label='Best {} ({})'.format(precision, txt), color=color,
+#                            edgecolor='black')
+#     eff_ax.legend(loc='best', title="Bayesian Optimization", framealpha=0.5)
+#     eff_plot.savefig('AUCROC_BO_{}.png'.format(precision))
+#     # eff_plot.savefig('AUCROC_FT_rand{}.pdf'.format(rand))
+#     eff_plot.show()
+#
+# # Accuracy plot
+# for precision, color in zip(precisions, colors):
+#     eff_plot = plt.figure()
+#     eff_ax = eff_plot.add_subplot()
+#     eff_ax.grid(True)
+#     eff_ax.set_xlabel('BOPs')
+#     eff_ax.set_ylabel('Accuracy')
+#     eff_ax.set_xscale("symlog", linthresh=1e6)
+#     eff_ax.set_xlim(1e4, 1e7)
+#     eff_ax.set_ylim(0.6, 0.8)
+#     eff_ax.set_title("Accuracy vs BOPS - BO ({} HLS4ML Jet Tagging Model)".format(precision))
+#     eff_ax.scatter([int(key) for key in dump_dict[precision]], [z['accuracy'] for z in dump_dict[precision].values()],
+#                    label='{}-bit'.format(precision.rstrip('b')), color=color, alpha=0.5)  # , marker='.',markersize=10,
+#     for txt, x, y in zip([str(z['dims']) for z in dump_dict[precision].values()], [int(key) for key in dump_dict[precision]],
+#                          [z['accuracy'] for z in dump_dict[precision].values()]):
+#         if txt == str(best[precision]):
+#             eff_ax.annotate(txt, (x, y), color='black', label='_nolegend_')
+#             eff_ax.scatter(x, y, marker="*", s=75, label='Best {} ({})'.format(precision, txt), color=color,
+#                            edgecolor='black')
+#     eff_ax.legend(loc='best', title="Bayesian Optimization", framealpha=0.5)
+#     eff_plot.savefig('ACC_BO_{}.png'.format(precision))
+#     # eff_plot.savefig('ACC_FT_rand{}.pdf'.format(rand))
+#     eff_plot.show()
+#
+# # Efficiency plot
+# for precision, color in zip(precisions, colors):
+#     eff_plot = plt.figure()
+#     eff_ax = eff_plot.add_subplot()
+#     eff_ax.grid(True)
+#     eff_ax.set_xlabel('BOPs')
+#     eff_ax.set_ylabel('Efficiency')
+#     eff_ax.set_xscale("symlog", linthresh=1e6)
+#     eff_ax.set_xlim(1e4, 1e7)
+#     eff_ax.set_ylim(0, 0.6)
+#     eff_ax.set_title("Efficiency vs BOPS BO ({} HLS4ML Jet Tagging Model)".format(precision))
+#     eff_ax.scatter([int(key) for key in dump_dict[precision]], [z['net_efficiency'] for z in dump_dict[precision].values()],
+#                    label='{}-bit'.format(precision.rstrip('b')), color=color, alpha=0.5)  # , marker='.',markersize=10,
+#     for txt, x, y in zip([str(z['dims']) for z in dump_dict[precision].values()], [int(key) for key in dump_dict[precision]],
+#                          [z['net_efficiency'] for z in dump_dict[precision].values()]):
+#         if txt == str(best[precision]):
+#             eff_ax.annotate(txt, (x, y), color='black', label='_nolegend_')
+#             eff_ax.scatter(x, y, marker="*", s=75, label='Best {} ({})'.format(precision, txt), color=color,
+#                            edgecolor='black')
+#     eff_ax.legend(loc='best', title="Bayesian Optimization", framealpha=0.5)
+#     eff_plot.savefig('Eff_BO_{}.png'.format(precision))
+#     # eff_plot.savefig('ACC_FT_rand{}.pdf'.format(rand))
+#     eff_plot.show()
 

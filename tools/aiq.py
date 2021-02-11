@@ -35,7 +35,7 @@ def calc_AiQ(aiq_model, test_loader, batnorm = True, device='cpu', loadfile=None
     accuracy_list = []
     roc_list = []
     sel_bkg_reject_list = []
-
+    eval_loss_value_list = []
     # Initialize arrays for storing microstates
     if batnorm:
         microstates = {name: np.ndarray([]) for name, module in aiq_model.named_modules() if
@@ -68,7 +68,7 @@ def calc_AiQ(aiq_model, test_loader, batnorm = True, device='cpu', loadfile=None
     for i, data in enumerate(test_loader, 0):
         activation_outputs.clear()
         local_batch, local_labels = data
-
+        criterion = torch.nn.BCELoss()
         # Run through our test batch and get inference results
         with torch.no_grad():
             local_batch, local_labels = local_batch.to('cpu'), local_labels.to('cpu')
@@ -83,7 +83,7 @@ def calc_AiQ(aiq_model, test_loader, batnorm = True, device='cpu', loadfile=None
                 lbllist = torch.cat([lbllist, torch.max(local_labels, 1)[1].view(-1).cpu()])
                 accuracy_list.append(np.average((accuracy_score(lbllist.numpy(), predlist.numpy()))))
                 roc_list.append(roc_auc_score(np.nan_to_num(local_labels.numpy()), np.nan_to_num(outputs.numpy())))
-
+                eval_loss_value_list.append(criterion(outputs, local_labels.float()))
                 # Calculate background eff @ signal eff of 50%
                 df = pd.DataFrame()
                 fpr = {}
@@ -164,6 +164,7 @@ def calc_AiQ(aiq_model, test_loader, batnorm = True, device='cpu', loadfile=None
             sel_bkg_reject = {}
             accuracy = np.average(accuracy_list)
             auc_roc = np.average(roc_list)
+            BCE_loss = np.average(eval_loss_value_list)
             # print(sel_bkg_reject_list)
             for label in testlabels:
                 sel_bkg_reject.update({label: np.average([batch[label] for batch in sel_bkg_reject_list])})
@@ -182,12 +183,14 @@ def calc_AiQ(aiq_model, test_loader, batnorm = True, device='cpu', loadfile=None
             print('Accuracy: {}'.format(accuracy))
             print('AUC ROC Score: {}'.format(auc_roc))
             print('aIQ: {}'.format(aiq))
+            print('BCE Loss: {}'.format(BCE_loss))
             print('Execution time: {}'.format(time.time() - start_time))
             print('')
             # Return AiQ along with our metrics
             return {'AiQ': aiq,
                     'accuracy': accuracy,
                     'auc_roc': auc_roc,
+                    'bce_loss': float(BCE_loss),
                     'net_efficiency': net_efficiency,
                     'sel_bkg_reject': sel_bkg_reject,
                     'layer_metrics': layer_metrics}
