@@ -33,7 +33,7 @@ from tools.aiq import calc_AiQ
 from tools.param_count import calc_BOPS, countNonZeroWeights
 from tools.parse_yaml_config import parse_config
 
-def gen_bo_model_dict(dir, bits=32):
+def gen_bo_model_dict(dir, bits=32, loadmodel=None):
     # Modified to load a set of BO models (with varying layer sizes)
     # Provide an instance of the model you're loading (to calculate # params)
     # and the path to folder containing model files, returns a dict with the format {pruned params:path to model}
@@ -42,6 +42,10 @@ def gen_bo_model_dict(dir, bits=32):
     model_sizes = []
     first = True
     total_param = 0
+    if bits > 9:
+        bitlen = 2
+    else:
+        bitlen = 1
     if os.path.isdir(dir):
         print("Directory found! Loading dir: " + dir)
         dir_list = os.listdir(dir)
@@ -49,15 +53,19 @@ def gen_bo_model_dict(dir, bits=32):
         for file in dir_list:
             try:
                 #sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
-                sizestr1 = file[7:]
+                sizestr1 = file[6+bitlen:]
                 sizestr = sizestr1[:-5]
                 dims = [int(m) for m in sizestr.replace(' ', '').split(',')]
+                print(dims)
                 prune_masks = {
                     "fc1": torch.ones(dims[0], 16),
                     "fc2": torch.ones(dims[1], dims[0]),
                     "fc3": torch.ones(dims[2], dims[1]),
                     "fc4": torch.ones(5, dims[2])}
-                bomodel = models.three_layer_model_bv_tunable(prune_masks,dims,bits) #Shouldnt have to worry about correct precision for simple param count (for now)
+                if bits < 32:
+                    bomodel = models.three_layer_model_bv_tunable(prune_masks,dims,bits)
+                else:
+                    bomodel = models.three_layer_model_tunable(prune_masks, dims)  # 32b, non quantized model
                 bomodel.load_state_dict(torch.load(os.path.join(dir, file), map_location=device))
                 count, total_param, _, _ = countNonZeroWeights(bomodel)
                 bops = calc_BOPS(bomodel)
@@ -124,29 +132,29 @@ dir = "model_files/"
 dir = options.model_files
 
 
-# try:
-#     if options.batnorm:
-#         loadmodel = models.three_layer_model_batnorm_masked(prune_mask_set, bn_affine=options.bn_affine,
-#                                                         bn_stats=options.bn_stats)
-#     else:
-#         loadmodel = models.three_layer_model_masked(prune_mask_set)  # 32b
-#
-#     float_model_set, model_max_params = gen_bo_model_dict(os.path.join(dir, '32b'),32)
-# except Exception as e:
-#     print(e)
-#     float_model_set, model_max_params = {},0
-#
-#
+try:
+    if options.batnorm:
+        loadmodel = models.three_layer_model_batnorm_masked(prune_mask_set, bn_affine=options.bn_affine,
+                                                        bn_stats=options.bn_stats)
+    else:
+        loadmodel = models.three_layer_model_masked(prune_mask_set)  # 32b
+
+    float_model_set, model_max_params = gen_bo_model_dict(os.path.join(dir, '32b'),32,loadmodel)
+except Exception as e:
+    print(e)
+    float_model_set, model_max_params = {},0
+
+
 # try:
 #     quant_model_set_4b, quant_4b_max_params = gen_bo_model_dict(os.path.join(dir, '4b'),4)
 # except:
 #     quant_model_set_4b, quant_4b_max_params = {},0
 
 
-try:
-    quant_model_set_6b, quant_6b_max_params = gen_bo_model_dict(os.path.join(dir, '6b'),6)
-except:
-    quant_model_set_6b, quant_6b_max_params = {},0
+# try:
+#     quant_model_set_6b, quant_6b_max_params = gen_bo_model_dict(os.path.join(dir, '6b'),6)
+# except:
+#     quant_model_set_6b, quant_6b_max_params = {},0
 
 
 # try:
@@ -155,21 +163,24 @@ except:
 #     quant_model_set_12b, quant_12b_max_params = {},0
 
 #Run through each model set, calculating AiQ for each model in the set
-# float_AiQ = {}
-# for model_bops, model_file in sorted(float_model_set.items()):
-#     sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
-#     dims = [int(m) for m in sizestr.split(',')]
-#     size = dims
-#     prune_masks = {
-#         "fc1": torch.ones(dims[0], 16),
-#         "fc2": torch.ones(dims[1], dims[0]),
-#         "fc3": torch.ones(dims[2], dims[1]),
-#         "fc4": torch.ones(5, dims[2])}
-#     print('Calculating AiQ for BO 32b, ' + str(model_bops) + ' BOPS, size ' + str(size))
-#     results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,32), test_loader, loadfile=os.path.join(dir, '32b', model_file),
-#                        batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
-#     results.update({'dims': dims})
-#     float_AiQ.update({model_bops: results})
+float_AiQ = {}
+for model_bops, model_file in sorted(float_model_set.items()):
+    #sizestr = re.search('(\d\d?-\d\d?-\d\d?_)',model_file).group().strip('_').replace('-',', ') #Get the model side from the filename, just saves a bunch of headache
+    sizestr1 = model_file[8:] # 8 since "32" in string vs "6"
+    sizestr = sizestr1[:-5]
+    dims = [int(m) for m in sizestr.split(',')]
+    size = dims
+    print(dims)
+    prune_masks = {
+        "fc1": torch.ones(dims[0], 16),
+        "fc2": torch.ones(dims[1], dims[0]),
+        "fc3": torch.ones(dims[2], dims[1]),
+        "fc4": torch.ones(5, dims[2])}
+    print('Calculating AiQ for BO 32b, ' + str(model_bops) + ' BOPS, size ' + str(size))
+    results = calc_AiQ(models.three_layer_model_tunable(prune_masks, dims), test_loader, loadfile=os.path.join(dir, '32b', model_file),
+                       batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
+    results.update({'dims': dims, 'best': False})
+    float_AiQ.update({model_bops: results})
 #
 # quant_12b_AiQ = {}
 # for model_bops, model_file in sorted(quant_model_set_12b.items()):
@@ -204,39 +215,40 @@ except:
 #     results.update({'dims': dims})
 #     quant_4b_AiQ.update({model_bops: results})
 
-quant_6b_AiQ = {}
-for model_bops, model_file in sorted(quant_model_set_6b.items()):
-    #sizestr = re.search('(\d\d?,\d\d?,\d\d?)',model_file.replace(' ','')).group() #Get the model side from the filename, just saves a bunch of headache
-    sizestr1 = model_file[7:]
-    sizestr = sizestr1[:-5]
-    dims = [int(m) for m in sizestr.replace(' ', '').split(',')]
-    size = dims
-
-    prune_masks = {
-        "fc1": torch.ones(dims[0], 16),
-        "fc2": torch.ones(dims[1], dims[0]),
-        "fc3": torch.ones(dims[2], dims[1]),
-        "fc4": torch.ones(5, dims[2])}
-    print('Calculating AiQ for BO 6b, ' + str(model_bops) + ' BOPS, size ' + str(size))
-    results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,6), test_loader, loadfile=os.path.join(dir, '6b', model_file),
-                       batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
-    results.update({'dims': dims, 'best': False})
-    quant_6b_AiQ.update({model_bops: results})
+# quant_6b_AiQ = {}
+# for model_bops, model_file in sorted(quant_model_set_6b.items()):
+#     #sizestr = re.search('(\d\d?,\d\d?,\d\d?)',model_file.replace(' ','')).group() #Get the model side from the filename, just saves a bunch of headache
+#     sizestr1 = model_file[7:]
+#     sizestr = sizestr1[:-5]
+#     dims = [int(m) for m in sizestr.replace(' ', '').split(',')]
+#     size = dims
+#
+#     prune_masks = {
+#         "fc1": torch.ones(dims[0], 16),
+#         "fc2": torch.ones(dims[1], dims[0]),
+#         "fc3": torch.ones(dims[2], dims[1]),
+#         "fc4": torch.ones(5, dims[2])}
+#     print('Calculating AiQ for BO 6b, ' + str(model_bops) + ' BOPS, size ' + str(size))
+#     results = calc_AiQ(models.three_layer_model_bv_tunable(prune_masks,size,6), test_loader, loadfile=os.path.join(dir, '6b', model_file),
+#                        batnorm = options.batnorm, device='cpu', full_results=True, testlabels=test_labels)
+#     results.update({'dims': dims, 'best': False})
+#     quant_6b_AiQ.update({model_bops: results})
 
 #doesn't work right now, just selects the last item as best :/
 best_loss_bops = 0
-for bops, results in quant_6b_AiQ.items():
+for bops, results in float_AiQ.items():
+    print(bops, results)
     best_loss = float(999999)
     if results['bce_loss'] < best_loss:
         best_loss = results['bce_loss']
         print (best_loss)
         best_loss_bops = bops
-quant_6b_AiQ[best_loss_bops].update({'best': True})
+float_AiQ[best_loss_bops].update({'best': True})
 
 import json
-dump_dict={ #'32b':float_AiQ,
+dump_dict={ '32b':float_AiQ,
             #'12b':quant_12b_AiQ,
-            '6b':quant_6b_AiQ#,
+            #'6b':quant_6b_AiQ#,
             #'4b':quant_4b_AiQ
 }
 

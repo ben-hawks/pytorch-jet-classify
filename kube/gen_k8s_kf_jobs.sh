@@ -4,6 +4,7 @@
 mkdir -p ./jobs
 mkdir -p ./jobs/KF
 mkdir -p ./jobs/KF/post_jobs
+mkdir -p ./jobs/KF/BO_Best
 prec=(32 12 6 4) #8
 kfolds=(1 2 3 4)
 rand=(0 50 75 90)

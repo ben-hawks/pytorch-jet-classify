@@ -41,7 +41,9 @@ hep.set_style(hep.style.ROOT)
 # Randwise plots has been intended to be used with this, as all plots are error bars and require an
 # error value
 
-precisions = ['32b','12b','6b','4b']  #,'8b']  # What precisions to plot
+#precisions = ['32b','12b','6b','4b']  #,'8b']  # What precisions to plot
+precisions = [#'32b','12b',
+     '6b'] #,'4b']
 colors = ['blue', 'green', 'red', 'orange', 'purple', 'pink']  # What colors to use for plots
 
 markers=['D','x','o','v','^','<','>','s','p','P','*','H','h','+',',','X','D','d','|','_','1','2','3','4','8',]
@@ -291,8 +293,8 @@ def randwise_plots(datasets, filename="FT", legendtitle="Fine Tuning Pruning",
         eff_ax = eff_plot.add_subplot()
         #eff_ax.set_title("Efficiency vs BOPS ({} HLS4ML Jet Tagging Model)".format(width))
         eff_ax.grid(True)
-        eff_ax.set_xlabel('BOPs   ',labelpad=20)
-        eff_ax.set_ylabel('Efficiency')
+        eff_ax.set_xlabel('BOPs   ',labelpad=20, loc='right')
+        eff_ax.set_ylabel('Efficiency', loc='top')
         if width == "32b":
             eff_ax.set_xscale("symlog", linthresh=1e6)
             eff_ax.set_xlim(1e4, 1e7)
@@ -311,8 +313,8 @@ def randwise_plots(datasets, filename="FT", legendtitle="Fine Tuning Pruning",
                 eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color=color, label='_nolegend_')
             if filename is "FT":
                 #txt = [str(z['dims']) for z in BO_best[rand][width].values()]
-                x = [int(key) for key in BO_best[rand][width]]
-                y = [z['net_efficiency'] for z in BO_best[rand][width].values()]
+                x = [int(key) for key in BO_best_6b[rand][width]]
+                y = [z['net_efficiency'] for z in BO_best_6b[rand][width].values()]
                 eff_ax.scatter(x, y, marker="*", s=200, label='Best BO @ {}% Rand'.format(rand), color=color,
                                edgecolor='black', zorder=10)
         plt.legend(title=legendtitle, loc='best', framealpha=0.5)
@@ -324,8 +326,8 @@ def randwise_plots(datasets, filename="FT", legendtitle="Fine Tuning Pruning",
         eff_ax = eff_plot.add_subplot()
         #eff_ax.set_title("Accuracy vs BOPS ({} HLS4ML Jet Tagging Model)".format(width))
         eff_ax.grid(True)
-        eff_ax.set_xlabel('BOPs   ',labelpad=20)
-        eff_ax.set_ylabel('Accuracy')
+        eff_ax.set_xlabel('BOPs   ',labelpad=20, loc='right')
+        eff_ax.set_ylabel('Accuracy', loc='top')
         if width == "32b":
             eff_ax.set_xscale("symlog", linthresh=1e6)
             eff_ax.set_xlim(1e4, 1e7)
@@ -348,10 +350,10 @@ def randwise_plots(datasets, filename="FT", legendtitle="Fine Tuning Pruning",
                                   [z['accuracy'] for z in FT[width].values()], markers):
                 eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color=color, label='_nolegend_')
             if filename is "FT":
-                print(BO_best[rand][width])
+                print(BO_best_6b[rand][width])
                 #txt = [str(z['dims']) for z in BO_best[rand][width].values()]
-                x = [int(key) for key in BO_best[rand][width]]
-                y = [z['accuracy'] for z in BO_best[rand][width].values()]
+                x = [int(key) for key in BO_best_6b[rand][width]]
+                y = [z['accuracy'] for z in BO_best_6b[rand][width].values()]
                 eff_ax.scatter(x, y, marker="*", s=200, label='Best BO @ {}% Rand'.format(rand), color=color,
                                edgecolor='black', zorder=10)
         plt.legend(title=legendtitle, loc='best', framealpha=0.5)
@@ -432,15 +434,21 @@ if __name__ == "__main__":
     with open("../results_json/BO_Redo/BO_6b_Wide.json", "r") as read_file:
         BO_6b_wide = json.load(read_file)
 
-    with open("../results_json/BO_Redo/BO_combo.json", "r") as read_file:
-        BO_combo = json.load(read_file)
+    with open("../results_json/BO_Redo/BO_6b_testset.json", "r") as read_file:
+        BO_6b = json.load(read_file)
 
+    with open("../results_json/BO_Redo/BO_32b_testset.json", "r") as read_file:
+        BO_32b = json.load(read_file)
+        
     BO_best = {r:{} for r in rand_vals}
     for rand in BO_best:
         with open("../results_json/BO_Redo/BO_Best_{}_AiQ.json".format(rand), "r") as read_file:
             BO_best[rand].update(json.load(read_file))
 
-
+    BO_best_6b = {r:{} for r in rand_vals}
+    for rand in BO_best:
+        with open("../results_json/BO_Redo/BO_Best_{}_6b.json".format(rand), "r") as read_file:
+            BO_best_6b[rand].update(json.load(read_file))
 
    # FT_Trainset = []
    # for rand in rand_vals:
@@ -464,7 +472,7 @@ if __name__ == "__main__":
 
     #Normal, "Test Set" runs - Comment out lines to disable generation of that plot set
 
-    #randwise_plots(FT_kf, "FT")
+    randwise_plots(FT_kf, "FT")
     #randwise_plots(FT_NoBN_kf, "FT_NoBN", "FT, No BatNorm")
     #randwise_plots(FT_NoL1_kf, "FT_NoL1", "FT, No L1 Reg")
     #randwise_plots(LT_kf, "LT")
@@ -503,12 +511,12 @@ if __name__ == "__main__":
                           [z['accuracy'] for z in FT_kf[0]['4b'].values()], markers):
         eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color='blue', label='_nolegend_')
 
-    eff_ax.scatter([int(key) for key in BO['32b']], [z['accuracy'] for z in BO['32b'].values()],
+    eff_ax.scatter([int(key) for key in BO_32b['32b']], [z['accuracy'] for z in BO_32b['32b'].values()],
                    label='32b BO', color='red', s=200,
                    alpha=0.1)  # , marker='.',markersize=10,
-    for txt, x, y, isbest in zip([str(z['dims']) for z in BO['32b'].values()], [int(key) for key in BO['32b']],
-                                 [z['accuracy'] for z in BO['32b'].values()],
-                                 [z['best'] for z in BO['32b'].values()]):
+    for txt, x, y, isbest in zip([str(z['dims']) for z in BO_32b['32b'].values()], [int(key) for key in BO_32b['32b']],
+                                 [z['accuracy'] for z in BO_32b['32b'].values()],
+                                 [z['best'] for z in BO_32b['32b'].values()]):
         if isbest:
             eff_ax.annotate(txt, (x, y), color='red', label='_nolegend_', size=24)
             eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('32b', txt), color='red',
@@ -532,15 +540,83 @@ if __name__ == "__main__":
     eff_plot.show()
 
 
+    # # BO 6b vs 32b (seperated scans)
+    # # Accuracy plot
+    # eff_plot = plt.figure()
+    # eff_ax = eff_plot.add_subplot()
+    # eff_ax.grid(True)
+    # eff_ax.set_xlabel('BOPs')
+    # eff_ax.set_ylabel('Accuracy')
+    # eff_ax.set_xscale("symlog", linthresh=1e6)
+    # eff_ax.set_xlim(1.5e4, 1e7)
+    # eff_ax.set_ylim(0.6, 0.8)
+    # # eff_ax.set_title("Accuracy vs BOPS (HLS4ML Jet Tagging Model)")
+    # eff_ax.errorbar([int(key) for key in FT_kf[0]['32b']],
+    #                 [z['accuracy'] for z in FT_kf[0]['32b'].values()],
+    #                 [z['accuracy_err'] for z in FT_kf[0]['32b'].values()],
+    #                 label='32b FT', capsize=8,
+    #                 linestyle='solid', color='red')  # , marker='.',markersize=10,
+    # for x, y, mark in zip([int(key) for key in FT_kf[0]['32b']],
+    #                       [z['accuracy'] for z in FT_kf[0]['32b'].values()], markers):
+    #     eff_ax.plot(x, y, linestyle='solid', marker=mark, markersize=10, color='red', label='_nolegend_')
+    #
+    # eff_ax.errorbar([int(key) for key in FT_kf[0]['6b']],
+    #                 [z['accuracy'] for z in FT_kf[0]['6b'].values()],
+    #                 [z['accuracy_err'] for z in FT_kf[0]['6b'].values()],
+    #                 label='6b FT', capsize=8,
+    #                 linestyle='solid', color='blue')  # , marker='.',markersize=10,
+    # for x, y, mark in zip([int(key) for key in FT_kf[0]['6b']],
+    #                       [z['accuracy'] for z in FT_kf[0]['6b'].values()], markers):
+    #     eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color='blue', label='_nolegend_')
+    #
+    # eff_ax.scatter([int(key) for key in BO_32b['32b']], [z['accuracy'] for z in BO_32b['32b'].values()],
+    #                label='32b BO', color='red', s=200,
+    #                alpha=0.1)  # , marker='.',markersize=10,
+    # for txt, x, y, isbest in zip([str(z['dims']) for z in BO_32b['32b'].values()], [int(key) for key in BO_32b['32b']],
+    #                              [z['accuracy'] for z in BO_32b['32b'].values()],
+    #                              [z['best'] for z in BO_32b['32b'].values()]):
+    #     if isbest:
+    #         print(txt)
+    #         eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('32b', txt), color='red',
+    #                        edgecolor='blue', zorder=10)
+    #
+    # eff_ax.scatter([int(key) for key in BO_6b['6b']], [z['accuracy'] for z in BO_6b['6b'].values()],
+    #                label='6b BO', color='blue', s=200,
+    #                alpha=0.1)  # , marker='.',markersize=10,
+    # for txt, x, y, isbest in zip([str(z['dims']) for z in BO_6b['6b'].values()], [int(key) for key in BO_6b['6b']],
+    #                              [z['accuracy'] for z in BO_6b['6b'].values()],
+    #                              [z['best'] for z in BO_6b['6b'].values()]):
+    #     if isbest:
+    #         #eff_ax.annotate(txt, (x, y), color='blue', label='_nolegend_', size=24)
+    #         eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('6b', txt), color='blue',
+    #                        edgecolor='red', zorder=10)
+    #
+    # eff_ax.scatter([int(key) for key in BO_6b_wide['6b']], [z['accuracy'] for z in BO_6b_wide['6b'].values()],
+    #                label='6b BO (Wide Scan)', color='green', s=200,
+    #                alpha=0.1)  # , marker='.',markersize=10,
+    # for txt, x, y, isbest in zip([str(z['dims']) for z in BO_6b_wide['6b'].values()], [int(key) for key in BO_6b_wide['6b']],
+    #                              [z['accuracy'] for z in BO_6b_wide['6b'].values()],
+    #                              [z['best'] for z in BO_6b_wide['6b'].values()]):
+    #     if isbest:
+    #         # eff_ax.annotate(txt, (x, y), color='blue', label='_nolegend_', size=24)
+    #         eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('6b', txt), color='green',
+    #                        edgecolor='red', zorder=10)
+    # eff_ax.legend(title='Optimization Technique', loc='best', framealpha=0.5)
+    # # eff_ax.add_artist(
+    # #    plt.legend(handles=marker_lines, title='Percent pruned (approx.)', loc='upper right', framealpha=0.5))
+    # eff_plot.savefig('ACC_BOFT_32_6.pdf')
+    # # eff_plot.savefig('ACC_FT_BNcomp.pdf')
+    # eff_plot.show()
+
     # BO 6b vs 32b
     # Accuracy plot
     eff_plot = plt.figure()
     eff_ax = eff_plot.add_subplot()
     eff_ax.grid(True)
-    eff_ax.set_xlabel('BOPs')
-    eff_ax.set_ylabel('Accuracy')
+    eff_ax.set_xlabel('BOPs', loc='right')
+    eff_ax.set_ylabel('Accuracy', loc='top')
     eff_ax.set_xscale("symlog", linthresh=1e6)
-    eff_ax.set_xlim(1e4, 1e7)
+    eff_ax.set_xlim(0.5e5, 1e7)
     eff_ax.set_ylim(0.6, 0.8)
     # eff_ax.set_title("Accuracy vs BOPS (HLS4ML Jet Tagging Model)")
     eff_ax.errorbar([int(key) for key in FT_kf[0]['32b']],
@@ -561,99 +637,31 @@ if __name__ == "__main__":
                           [z['accuracy'] for z in FT_kf[0]['6b'].values()], markers):
         eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color='blue', label='_nolegend_')
 
-    eff_ax.scatter([int(key) for key in BO['32b']], [z['accuracy'] for z in BO['32b'].values()],
+    eff_ax.scatter([int(key) for key in BO_32b['32b']], [z['accuracy'] for z in BO_32b['32b'].values()],
                    label='32b BO', color='red', s=200,
                    alpha=0.1)  # , marker='.',markersize=10,
-    for txt, x, y, isbest in zip([str(z['dims']) for z in BO['32b'].values()], [int(key) for key in BO['32b']],
-                                 [z['accuracy'] for z in BO['32b'].values()],
-                                 [z['best'] for z in BO['32b'].values()]):
-        if isbest:
-            #eff_ax.annotate(txt, (x, y), color='red', label='_nolegend_', size=24)
-            eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('32b', txt), color='red',
-                           edgecolor='blue', zorder=10)
-
-    eff_ax.scatter([int(key) for key in BO['6b']], [z['accuracy'] for z in BO['6b'].values()],
-                   label='6b BO', color='blue', s=200,
-                   alpha=0.1)  # , marker='.',markersize=10,
-    for txt, x, y, isbest in zip([str(z['dims']) for z in BO['6b'].values()], [int(key) for key in BO['6b']],
-                                 [z['accuracy'] for z in BO['6b'].values()],
-                                 [z['best'] for z in BO['6b'].values()]):
-        if isbest:
-            #eff_ax.annotate(txt, (x, y), color='blue', label='_nolegend_', size=24)
-            eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('6b', txt), color='blue',
-                           edgecolor='red', zorder=10)
-
-    eff_ax.scatter([int(key) for key in BO_6b_wide['6b']], [z['accuracy'] for z in BO_6b_wide['6b'].values()],
-                   label='6b BO (Wide Scan)', color='green', s=200,
-                   alpha=0.1)  # , marker='.',markersize=10,
-    for txt, x, y, isbest in zip([str(z['dims']) for z in BO_6b_wide['6b'].values()], [int(key) for key in BO_6b_wide['6b']],
-                                 [z['accuracy'] for z in BO_6b_wide['6b'].values()],
-                                 [z['best'] for z in BO_6b_wide['6b'].values()]):
-        if isbest:
-            # eff_ax.annotate(txt, (x, y), color='blue', label='_nolegend_', size=24)
-            eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('6b', txt), color='green',
-                           edgecolor='red', zorder=10)
-    eff_ax.legend(title='Optimization Technique', loc='best', framealpha=0.5)
-    # eff_ax.add_artist(
-    #    plt.legend(handles=marker_lines, title='Percent pruned (approx.)', loc='upper right', framealpha=0.5))
-    eff_plot.savefig('ACC_BOFT_32_6.pdf')
-    # eff_plot.savefig('ACC_FT_BNcomp.pdf')
-    eff_plot.show()
-
-    # BO 6b vs 32b
-    # Accuracy plot
-    eff_plot = plt.figure()
-    eff_ax = eff_plot.add_subplot()
-    eff_ax.grid(True)
-    eff_ax.set_xlabel('BOPs')
-    eff_ax.set_ylabel('Accuracy')
-    eff_ax.set_xscale("symlog", linthresh=1e6)
-    eff_ax.set_xlim(1e4, 1e7)
-    eff_ax.set_ylim(0.6, 0.8)
-    # eff_ax.set_title("Accuracy vs BOPS (HLS4ML Jet Tagging Model)")
-    eff_ax.errorbar([int(key) for key in FT_kf[0]['32b']],
-                    [z['accuracy'] for z in FT_kf[0]['32b'].values()],
-                    [z['accuracy_err'] for z in FT_kf[0]['32b'].values()],
-                    label='32b FT', capsize=8,
-                    linestyle='solid', color='red')  # , marker='.',markersize=10,
-    for x, y, mark in zip([int(key) for key in FT_kf[0]['32b']],
-                          [z['accuracy'] for z in FT_kf[0]['32b'].values()], markers):
-        eff_ax.plot(x, y, linestyle='solid', marker=mark, markersize=10, color='red', label='_nolegend_')
-
-    eff_ax.errorbar([int(key) for key in FT_kf[0]['6b']],
-                    [z['accuracy'] for z in FT_kf[0]['6b'].values()],
-                    [z['accuracy_err'] for z in FT_kf[0]['6b'].values()],
-                    label='6b FT', capsize=8,
-                    linestyle='solid', color='blue')  # , marker='.',markersize=10,
-    for x, y, mark in zip([int(key) for key in FT_kf[0]['6b']],
-                          [z['accuracy'] for z in FT_kf[0]['6b'].values()], markers):
-        eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color='blue', label='_nolegend_')
-
-    eff_ax.scatter([int(key) for key in BO['32b']], [z['accuracy'] for z in BO['32b'].values()],
-                   label='32b BO', color='red', s=200,
-                   alpha=0.1)  # , marker='.',markersize=10,
-    for txt, x, y, isbest in zip([str(z['dims']) for z in BO['32b'].values()], [int(key) for key in BO['32b']],
-                                 [z['accuracy'] for z in BO['32b'].values()],
-                                 [z['best'] for z in BO['32b'].values()]):
+    for txt, x, y, isbest in zip([str(z['dims']) for z in BO_32b['32b'].values()], [int(key) for key in BO_32b['32b']],
+                                 [z['accuracy'] for z in BO_32b['32b'].values()],
+                                 [z['best'] for z in BO_32b['32b'].values()]):
         if isbest:
             # eff_ax.annotate(txt, (x, y), color='red', label='_nolegend_', size=24)
             eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('32b', txt), color='red',
                            edgecolor='blue', zorder=10)
 
-    eff_ax.scatter([int(key) for key in BO_combo['6b']], [z['accuracy'] for z in BO_combo['6b'].values()],
-                   label='6b BO (combo)', color='blue', s=200,
+    eff_ax.scatter([int(key) for key in BO_6b['6b']], [z['accuracy'] for z in BO_6b['6b'].values()],
+                   label='6b BO', color='blue', s=200,
                    alpha=0.1)  # , marker='.',markersize=10,
-    for txt, x, y, isbest in zip([str(z['dims']) for z in BO_combo['6b'].values()], [int(key) for key in BO_combo['6b']],
-                                 [z['accuracy'] for z in BO_combo['6b'].values()],
-                                 [z['best'] for z in BO_combo['6b'].values()]):
+    for txt, x, y, isbest in zip([str(z['dims']) for z in BO_6b['6b'].values()], [int(key) for key in BO_6b['6b']],
+                                 [z['accuracy'] for z in BO_6b['6b'].values()],
+                                 [z['best'] for z in BO_6b['6b'].values()]):
         if isbest:
             # eff_ax.annotate(txt, (x, y), color='blue', label='_nolegend_', size=24)
             eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('6b', txt), color='blue',
                            edgecolor='red', zorder=10)
-    eff_ax.legend(title='Optimization Technique', loc='best', framealpha=0.5)
+    eff_ax.legend(title='Optimization technique', loc='center right', framealpha=0.5)
     # eff_ax.add_artist(
     #    plt.legend(handles=marker_lines, title='Percent pruned (approx.)', loc='upper right', framealpha=0.5))
-    eff_plot.savefig('ACC_BOFT_32_6_combo.pdf')
+    eff_plot.savefig('ACC_BOFT_32_6.pdf')
     # eff_plot.savefig('ACC_FT_BNcomp.pdf')
     eff_plot.show()
 
@@ -687,12 +695,12 @@ if __name__ == "__main__":
                           [z['accuracy'] for z in FT_kf[0]['12b'].values()], markers):
         eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color='blue', label='_nolegend_')
 
-    eff_ax.scatter([int(key) for key in BO['32b']], [z['accuracy'] for z in BO['32b'].values()],
+    eff_ax.scatter([int(key) for key in BO_32b['32b']], [z['accuracy'] for z in BO_32b['32b'].values()],
                    label='32b BO', color='red', s=200,
                    alpha=0.1)  # , marker='.',markersize=10,
-    for txt, x, y, isbest in zip([str(z['dims']) for z in BO['32b'].values()], [int(key) for key in BO['32b']],
-                                 [z['accuracy'] for z in BO['32b'].values()],
-                                 [z['best'] for z in BO['32b'].values()]):
+    for txt, x, y, isbest in zip([str(z['dims']) for z in BO_32b['32b'].values()], [int(key) for key in BO_32b['32b']],
+                                 [z['accuracy'] for z in BO_32b['32b'].values()],
+                                 [z['best'] for z in BO_32b['32b'].values()]):
         if isbest:
             eff_ax.annotate(txt, (x, y), color='red', label='_nolegend_', size=24)
             eff_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('32b', txt), color='red',
@@ -715,6 +723,8 @@ if __name__ == "__main__":
     # eff_plot.savefig('ACC_FT_BNcomp.pdf')
     eff_plot.show()
 
+    BO_6_32 = {**BO_6b, **BO_32b}  # Hacky combo for the sake of not re-writing the below plot much
+
     labels_list = ['j_g', 'j_q', 'j_w', 'j_z', 'j_t']
     for label in labels_list:
         print(label)
@@ -722,11 +732,11 @@ if __name__ == "__main__":
         aiq_ax = aiq_plot.add_subplot()
         # aiq_ax.set_title("{}'s Bkgrd Eff. @ Sig Eff = 50% vs BOPS (HLS4ML Jet Tag {}% Rand)".format(label,rand))
         aiq_ax.grid(True)
-        aiq_ax.set_xlabel('BOPS')
-        aiq_ax.set_ylabel('Background Efficiency @ Signal Efficiency of 50%')
+        aiq_ax.set_xlabel('BOPS', loc='right')
+        aiq_ax.set_ylabel('Background Efficiency @ Signal Efficiency of 50%', loc='right')
         aiq_ax.set_yscale('log')
         aiq_ax.set_xscale("symlog", linthresh=1e6)
-        aiq_ax.set_xlim(1e4, 1e7)
+        aiq_ax.set_xlim(.5e5, 1e7)
         aiq_ax.set_ylim(10e-4, 10e-1)
         bo_colors = ['red', 'blue']
         bo_edgecolors =  reversed(bo_colors)
@@ -741,12 +751,12 @@ if __name__ == "__main__":
                                   [z['sel_bkg_reject'][label] for z in FT_kf[0][w].values()], markers):
                 aiq_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color=color, label='_nolegend_')
             # BO
-            aiq_ax.scatter([int(key) for key in BO[w]], [z['sel_bkg_reject'][label] for z in BO[w].values()],
+            aiq_ax.scatter([int(key) for key in BO_6_32[w]], [z['sel_bkg_reject'][label] for z in BO_6_32[w].values()],
                            label='{} BO'.format(w), color=color, s=200,
                            alpha=0.1)  # , marker='.',markersize=10,
-            for txt, x, y, isbest in zip([str(z['dims']) for z in BO[w].values()], [int(key) for key in BO[w]],
-                                 [z['sel_bkg_reject'][label] for z in BO[w].values()],
-                                 [z['best'] for z in BO[w].values()]):
+            for txt, x, y, isbest in zip([str(z['dims']) for z in BO_6_32[w].values()], [int(key) for key in BO_6_32[w]],
+                                 [z['sel_bkg_reject'][label] for z in BO_6_32[w].values()],
+                                 [z['best'] for z in BO_6_32[w].values()]):
                 if isbest:
                     aiq_ax.scatter(x, y, marker="*", s=250, label='Best BO {} ({})'.format('6b', txt), color=color,
                                    edgecolor=ec, zorder=10)
@@ -1212,21 +1222,21 @@ if __name__ == "__main__":
                           [z['auc_roc'] for z in FT_kf[0]['6b'].values()], markers):
         eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color='blue', label='_nolegend_')
 
-    eff_ax.scatter([int(key) for key in BO['32b']], [z['auc_roc'] for z in BO['32b'].values()],
+    eff_ax.scatter([int(key) for key in BO_32b['32b']], [z['auc_roc'] for z in BO_32b['32b'].values()],
                    label='32b BO', color='red', s=200,
                    alpha=0.1)  # , marker='.',markersize=10,
-    for txt, x, y in zip([str(z['dims']) for z in BO['32b'].values()], [int(key) for key in BO['32b']],
-                         [z['auc_roc'] for z in BO['32b'].values()]):
+    for txt, x, y in zip([str(z['dims']) for z in BO_32b['32b'].values()], [int(key) for key in BO_32b['32b']],
+                         [z['auc_roc'] for z in BO_32b['32b'].values()]):
         if txt == str(best['32b']):
             eff_ax.annotate(txt, (x, y), color='red', label='_nolegend_', size=12)
             eff_ax.scatter(x, y, marker="*", s=200, label='Best BO {} ({})'.format('32b', txt), color='red',
                            edgecolor='black', zorder=10)
 
-    eff_ax.scatter([int(key) for key in BO['6b']], [z['auc_roc'] for z in BO['6b'].values()],
+    eff_ax.scatter([int(key) for key in BO_6b['6b']], [z['auc_roc'] for z in BO_6b['6b'].values()],
                    label='6b BO', color='blue', s=200,
                    alpha=0.1)  # , marker='.',markersize=10,
-    for txt, x, y in zip([str(z['dims']) for z in BO['6b'].values()], [int(key) for key in BO['6b']],
-                         [z['auc_roc'] for z in BO['6b'].values()]):
+    for txt, x, y in zip([str(z['dims']) for z in BO_6b['6b'].values()], [int(key) for key in BO_6b['6b']],
+                         [z['auc_roc'] for z in BO_6b['6b'].values()]):
         if txt == str(best['6b']):
             eff_ax.annotate(txt, (x, y), color='blue', label='_nolegend_', size=12)
             eff_ax.scatter(x, y, marker="*", s=200, label='Best BO {} ({})'.format('6b', txt), color='blue',
@@ -1262,21 +1272,21 @@ if __name__ == "__main__":
                           [z['net_efficiency'] for z in FT_kf[0]['6b'].values()], markers):
         eff_ax.plot(x, y, linestyle='none', marker=mark, markersize=10, color='blue', label='_nolegend_')
 
-    eff_ax.scatter([int(key) for key in BO['32b']], [z['net_efficiency'] for z in BO['32b'].values()],
+    eff_ax.scatter([int(key) for key in BO_32b['32b']], [z['net_efficiency'] for z in BO_32b['32b'].values()],
                    label='32b BO', color='red', s=200,
                    alpha=0.1)  # , marker='.',markersize=10,
-    for txt, x, y in zip([str(z['dims']) for z in BO['32b'].values()], [int(key) for key in BO['32b']],
-                         [z['net_efficiency'] for z in BO['32b'].values()]):
+    for txt, x, y in zip([str(z['dims']) for z in BO_32b['32b'].values()], [int(key) for key in BO_32b['32b']],
+                         [z['net_efficiency'] for z in BO_32b['32b'].values()]):
         if txt == str(best['32b']):
             eff_ax.annotate(txt, (x, y), color='red', label='_nolegend_', size=12)
             eff_ax.scatter(x, y, marker="*", s=200, label='Best BO {} ({})'.format('32b', txt), color='red',
                            edgecolor='black', zorder=10)
 
-    eff_ax.scatter([int(key) for key in BO['6b']], [z['net_efficiency'] for z in BO['6b'].values()],
+    eff_ax.scatter([int(key) for key in BO_6b['6b']], [z['net_efficiency'] for z in BO_6b['6b'].values()],
                    label='6b BO', color='blue' , s=200,
                    alpha=0.1)  # , marker='.',markersize=10,
-    for txt, x, y in zip([str(z['dims']) for z in BO['6b'].values()], [int(key) for key in BO['6b']],
-                         [z['net_efficiency'] for z in BO['6b'].values()]):
+    for txt, x, y in zip([str(z['dims']) for z in BO_6b['6b'].values()], [int(key) for key in BO_6b['6b']],
+                         [z['net_efficiency'] for z in BO_6b['6b'].values()]):
         if txt == str(best['6b']):
             eff_ax.annotate(txt, (x, y), color='blue', label='_nolegend_', size=12)
             eff_ax.scatter(x, y, marker="*", s=200, label='Best BO {} ({})'.format('6b', txt), color='blue',
