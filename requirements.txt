@@ -51,4 +51,4 @@ torchaudio==0.6.0
 torchsummaryX==1.3.0
 torchvision==0.6.0
 typing-extensions==3.7.4.3
-urllib3==1.25.10
+urllib3==1.26.5
