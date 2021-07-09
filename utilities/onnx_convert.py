@@ -21,5 +21,6 @@ if __name__ == "__main__":
     exportname="32b_70Pruned_FullModel"
 
     dummy_input = torch.randn(1,16)
-    torch.onnx.export(model, dummy_input, exportname+".onnx", verbose=True)#, input_names=input_names)#, output_names=output_names)
+    dynamic_axes = {'input': {0: 'batch'}, 'output': {0: 'batch'}}
+    torch.onnx.export(model, dummy_input, exportname+".onnx", verbose=True, input_names=['input'] , output_names=['output'], dynamic_axes=dynamic_axes)
     torch.save(model,exportname+".pth")
